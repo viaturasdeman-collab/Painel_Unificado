@@ -2257,6 +2257,15 @@ function montarCampoLocal(wrapId, valorAtual, status, modoEvento, tipo){
     wrap.innerHTML = _htmlSelectLocal(idCampo, valorAtual);
   }
 }
+// [NOVO] Campo "Local final" sempre em dropdown (Unidades + Diretorias + DEMAN)
+function montarCampoLocalFinal(){
+  const wrap = $('mf-local-wrap');
+  if(!wrap) return;
+  const inputAtual = wrap.querySelector('input, select');
+  const valorAtual = inputAtual && !inputAtual.disabled ? inputAtual.value : (wrap.dataset.valor || '');
+  wrap.dataset.valor = valorAtual;
+  wrap.innerHTML = _htmlSelectLocal('mf-local', valorAtual);
+}
 function trocarCampoLocal(wrapId, statusSelectId, modoEvento, tipo){
   const sel = $(statusSelectId); const wrap = $(wrapId);
   if(!sel || !wrap) return;
@@ -2713,7 +2722,8 @@ function limparFormManut(){
 
   $('mf-data').value = agoraDatetimeLocal();
   $('mf-status').value = 'Ativa';
-  montarCampoLocal('mf-local-wrap', '', $('mf-status').value, false);
+  $('mf-local-wrap').innerHTML = '';
+  montarCampoLocalFinal();
   $('mf-informante').value = '';
   $('mf-detalhes').value = '';
 
@@ -2735,7 +2745,7 @@ function abrirFormEvento(p){
   $('me-detalhes').value = '';
   $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
   showView('manutencao'); showManutTab('novo');
-  setTimeout(() => $('me-informante').focus(), 60);
+  setTimeout(() => { try{ $('me-informante').focus({ preventScroll: true }); }catch(e){ $('me-informante').focus(); } }, 60);
 }
 
 function abrirFormFinalizar(p){
@@ -2743,15 +2753,15 @@ function abrirFormFinalizar(p){
   processoAtual = p;
   setFormModo('finalizar');
   preencherProcInfoBox(p);
-  const tipoProc = p.tipo || TIPO_VIATURA;
   $('mf-data').value = agoraDatetimeLocal();
   $('mf-status').value = 'Ativa';
-  montarCampoLocal('mf-local-wrap', '', $('mf-status').value, false, tipoProc);
+  $('mf-local-wrap').innerHTML = '';
+  montarCampoLocalFinal();
   $('mf-informante').value = p.entrada ? p.entrada.informante : '';
   $('mf-detalhes').value = '';
   $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
   showView('manutencao'); showManutTab('novo');
-  setTimeout(() => $('mf-detalhes').focus(), 60);
+  setTimeout(() => { try{ $('mf-detalhes').focus({ preventScroll: true }); }catch(e){ $('mf-detalhes').focus(); } }, 60);
 }
 
 function cancelarFormManut(){
@@ -2857,6 +2867,7 @@ async function salvarEventoManut(){
   await loadDataManut();
   limparFormManut();
   showManutTab('registros');
+  window.scrollTo(0, 0);
 }
 
 async function salvarFinalizarManut(){
@@ -3060,6 +3071,7 @@ function fecharSucesso(){
   _sucessoMensagemWhats = '';
   limparFormManut();
   showManutTab('registros');
+  window.scrollTo(0, 0);
 }
 
 function getMesesDisponiveisManut(){
@@ -3855,7 +3867,8 @@ $('mm-save').addEventListener('click', salvarManut);
 $('mm-cancel').addEventListener('click', cancelarFormManut);
 $('mm-status').addEventListener('change', () => trocarCampoLocal('mm-local-wrap','mm-status',false));
 $('me-status').addEventListener('change', () => trocarCampoLocal('me-local-wrap','me-status',true, processoAtual ? processoAtual.tipo : undefined));
-$('mf-status').addEventListener('change', () => trocarCampoLocal('mf-local-wrap','mf-status',false, processoAtual ? processoAtual.tipo : undefined));
+// [ATUALIZADO] "Local final" sempre em dropdown → reagir a mudança de status re-renderizando o select
+$('mf-status').addEventListener('change', () => montarCampoLocalFinal());
 $('manutReportBtn').addEventListener('click', () => { if(!temPermissao('ver_manutencao')){ alert('Sem permissão.'); return; } abrirRelatorioManut(); });
 $('manutReportClose').addEventListener('click', () => {
   document.body.classList.remove('relatorio-aberto');
