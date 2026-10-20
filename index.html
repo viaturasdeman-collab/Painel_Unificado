@@ -437,7 +437,7 @@ select.stage-select:hover{border-color:var(--amber);}
 .user-actions .btn{font-size:12px;padding:7px 12px;flex:1;min-width:0;text-align:center;}
 
 /* ─── REPORT ─── */
-.report-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;width:100%;max-width:1100px;display:flex;flex-direction:column;gap:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);max-height:90dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+.report-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;width:100%;max-width:1200px;display:flex;flex-direction:column;gap:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);max-height:90dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .report-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
 .report-header h2{font-family:'Rajdhani',sans-serif;font-size:22px;margin:0;color:var(--amber);letter-spacing:.02em;}
 .report-header .meta{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);text-align:right;line-height:1.6;}
@@ -456,7 +456,7 @@ select.stage-select:hover{border-color:var(--amber);}
 
 .report-filters{font-size:12px;color:var(--text-dim);background:var(--surface-2);border-radius:8px;padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
 .report-filters b{color:var(--amber);}
-.report-filters select{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:'Inter',sans-serif;touch-action:manipulation;}
+.report-filters select, .report-filters input[type=text]{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:'Inter',sans-serif;touch-action:manipulation;}
 .report-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .report-table{width:100%;border-collapse:collapse;font-size:12px;}
 .report-table th{background:var(--surface-2);color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap;}
@@ -575,12 +575,13 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
 @media print{
   body{background:#fff;color:#000;}
-  .topbar, .sidebar, .sidebar-backdrop, .view:not(#view-os), .modal-overlay:not(#reportModal):not(#manutReportModal){display:none !important;}
+  .topbar, .sidebar, .sidebar-backdrop, .view:not(#view-os), .modal-overlay:not(#reportModal):not(#manutReportModal):not(#prevReportModal){display:none !important;}
   body.relatorio-aberto #view-os,
   body.relatorio-aberto #view-viaturas,
-  body.relatorio-aberto #view-manutencao { display: none !important; }
+  body.relatorio-aberto #view-manutencao,
+  body.relatorio-aberto #view-preventiva { display: none !important; }
   .main{margin-left:0;padding:0;}
-  #reportModal, #manutReportModal{position:static;background:#fff;display:block !important;padding:0;}
+  #reportModal, #manutReportModal, #prevReportModal{position:static;background:#fff;display:block !important;padding:0;}
   .report-box{background:#fff;color:#000;box-shadow:none;border:none;max-width:none;max-height:none;padding:0;overflow:visible;}
   .report-header h2{color:#000;}
   .report-header .meta{color:#333;}
@@ -595,7 +596,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
   .report-kpi.kpi-dist .kpi-value{color:#000;}
   .report-filters{background:#f2f2f2;color:#333;}
   .report-filters b{color:#000;}
-  .report-filters select{background:#fff;border:1px solid #999;color:#000;}
+  .report-filters select, .report-filters input[type=text]{background:#fff;border:1px solid #999;color:#000;}
   .report-table th{background:#e8e8e8;color:#000;border-bottom:2px solid #000;}
   .report-table td{color:#000;border-bottom:1px solid #ccc;}
   .report-actions{display:none !important;}
@@ -783,6 +784,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
             </select>
             <input type="text" id="prevSearch" placeholder="Buscar placa ou prefixo" autocapitalize="characters">
             <button class="btn ghost" id="prevClearFilterBtn" style="display:none;">Limpar filtro</button>
+            <button class="btn report" id="prevReportBtn">📄 Relatório</button>
           </div>
         </div>
         <div id="prevContent" class="prev-grid"></div>
@@ -1161,6 +1163,64 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
     <div class="report-actions">
       <button class="btn ghost" id="manutReportClose">Fechar</button>
       <button class="btn primary" id="manutReportPrint">🖨 Imprimir / Salvar PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── NOVO: Relatório de Manutenção Preventiva ─── -->
+<div id="prevReportModal" class="modal-overlay" style="display:none;">
+  <div class="report-box">
+    <div class="report-header"><h2>Relatório de Manutenção Preventiva</h2><div class="meta" id="prevReportMeta"></div></div>
+    <div class="report-kpis" id="prevReportKpis"></div>
+    <div class="report-filters">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%;">
+        <span><b>Situação:</b></span>
+        <select id="prevRepFilterOleo" style="min-width:130px;">
+          <option value="">Todas</option>
+          <option value="vermelho">🔴 Atrasadas</option>
+          <option value="amarelo">🟡 Próximas</option>
+          <option value="verde">🟢 Em dia</option>
+          <option value="vazio">— Sem dados</option>
+        </select>
+        <span><b>Previsão:</b></span>
+        <select id="prevRepFilterPrevisao" style="min-width:170px;">
+          <option value="">Todas</option>
+        </select>
+        <span><b>KM restante:</b></span>
+        <select id="prevRepFilterKm" style="min-width:150px;">
+          <option value="">Todos</option>
+          <option value="atrasado">Atrasado (≤ 0)</option>
+          <option value="curto">0 – 2.000 km</option>
+          <option value="medio">2.000 – 5.000 km</option>
+          <option value="longo">&gt; 5.000 km</option>
+          <option value="sem_dados">Sem dados</option>
+        </select>
+        <input type="text" id="prevRepFilterBusca" placeholder="Buscar prefixo/placa" style="min-width:170px;">
+        <button class="btn ghost" id="prevRepFilterLimpar" style="margin-left:auto;font-size:11px;padding:5px 10px;">Limpar filtros</button>
+      </div>
+      <span id="prevRepFilterResumo" style="font-size:11px;color:var(--text-dim);padding-top:6px;display:block;width:100%;"></span>
+    </div>
+    <div class="report-table-wrap">
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Prefixo</th>
+            <th>Placa</th>
+            <th>Situação</th>
+            <th style="text-align:right;">KM atual</th>
+            <th style="text-align:right;">KM próxima</th>
+            <th style="text-align:right;">Falta</th>
+            <th>Previsão</th>
+            <th>Situação do óleo</th>
+            <th>Garantia</th>
+          </tr>
+        </thead>
+        <tbody id="prevReportBody"></tbody>
+      </table>
+    </div>
+    <div class="report-actions">
+      <button class="btn ghost" id="prevReportClose">Fechar</button>
+      <button class="btn primary" id="prevReportPrint">🖨 Imprimir / Salvar PDF</button>
     </div>
   </div>
 </div>
@@ -2257,7 +2317,7 @@ function montarCampoLocal(wrapId, valorAtual, status, modoEvento, tipo){
     wrap.innerHTML = _htmlSelectLocal(idCampo, valorAtual);
   }
 }
-// [NOVO] Campo "Local final" sempre em dropdown (Unidades + Diretorias + DEMAN)
+// [FIX] "Local final" sempre em dropdown (Unidades + Diretorias + DEMAN)
 function montarCampoLocalFinal(){
   const wrap = $('mf-local-wrap');
   if(!wrap) return;
@@ -2620,7 +2680,9 @@ function showManutTab(name){
   $('manutPanel-registros').classList.toggle('active', name === 'registros');
   $('manutPanel-novo').classList.toggle('active', name === 'novo');
   setSidebarMovExpanded(true);
-  if(name === 'novo' && modoManutForm === 'criar') setTimeout(() => $('mm-tipo').focus(), 60);
+  // [FIX] Resetar scroll ao trocar de aba — evita "cair" no fim da página
+  window.scrollTo(0, 0);
+  if(name === 'novo' && modoManutForm === 'criar') setTimeout(() => $('mm-tipo').focus({ preventScroll: true }), 60);
 }
 
 function setFormModo(modo){
@@ -2745,7 +2807,7 @@ function abrirFormEvento(p){
   $('me-detalhes').value = '';
   $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
   showView('manutencao'); showManutTab('novo');
-  setTimeout(() => { try{ $('me-informante').focus({ preventScroll: true }); }catch(e){ $('me-informante').focus(); } }, 60);
+  // [FIX] Removido auto-focus em me-informante (causava scroll ao fim)
 }
 
 function abrirFormFinalizar(p){
@@ -2761,7 +2823,7 @@ function abrirFormFinalizar(p){
   $('mf-detalhes').value = '';
   $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
   showView('manutencao'); showManutTab('novo');
-  setTimeout(() => { try{ $('mf-detalhes').focus({ preventScroll: true }); }catch(e){ $('mf-detalhes').focus(); } }, 60);
+  // [FIX] Removido auto-focus em mf-detalhes (causava scroll ao fim)
 }
 
 function cancelarFormManut(){
@@ -2776,6 +2838,7 @@ function cancelarFormManut(){
   if(temDados && !confirm('Descartar o que foi digitado?')) return;
   limparFormManut();
   showManutTab('registros');
+  window.scrollTo(0, 0);
 }
 
 async function salvarManut(){
@@ -3404,9 +3467,11 @@ function showPrevTab(name){
   if(pPainel) pPainel.classList.toggle('active', name === 'painel');
   if(pAtual)  pAtual.classList.toggle('active', name === 'atualizar');
   setSidebarPrevExpanded(true);
+  // [FIX] Resetar scroll ao trocar de aba
+  window.scrollTo(0, 0);
   if(name === 'atualizar'){
     if(PREV_LISTA_COMPLETA.length === 0) loadListaCompletaPreventiva();
-    setTimeout(() => { var i = $('pf-busca'); if(i) i.focus(); }, 60);
+    setTimeout(() => { var i = $('pf-busca'); if(i) i.focus({ preventScroll: true }); }, 60);
   }
 }
 
@@ -3635,6 +3700,255 @@ function _handlePfBuscaInput(){
   renderDropdownViaturas();
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOVO: RELATÓRIO DE MANUTENÇÃO PREVENTIVA
+   Filtros: Situação do óleo · Previsão (mês) · KM restante · Busca
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let prevRepFiltroOleo = '';
+let prevRepFiltroPrevisao = '';
+let prevRepFiltroKm = '';
+let prevRepFiltroBusca = '';
+
+// Estima a data prevista da próxima troca de óleo
+function calcularPrevisaoTroca(v){
+  // 1) Já está atrasada em KM → data de hoje
+  if(v.falta != null && v.falta <= 0){
+    return { data: new Date(), vencida: true, origem: 'atrasada' };
+  }
+  // 2) Se a planilha tem data de próxima troca preenchida, usa ela
+  if(v.proximaTroca){
+    const d = parseDataBR(v.proximaTroca);
+    if(d && d.getFullYear() >= 2020){
+      return { data: d, vencida: false, origem: 'planilha' };
+    }
+  }
+  // 3) Estimar com base no ritmo de KM desde a última troca
+  if(v.kmAtual != null && v.kmProxima != null && v.falta != null && v.falta > 0){
+    let kmPorMes = 1500; // default razoável para viaturas operacionais
+    if(v.ultimaTroca && v.kmUltima != null && v.kmUltima < v.kmAtual){
+      const dtUltima = parseDataBR(v.ultimaTroca);
+      if(dtUltima && dtUltima.getTime() < Date.now()){
+        const meses = Math.max(0.5, (Date.now() - dtUltima.getTime()) / (30 * 86400000));
+        const kmRodados = v.kmAtual - v.kmUltima;
+        if(kmRodados > 100) kmPorMes = kmRodados / meses;
+      }
+    }
+    if(kmPorMes > 0 && isFinite(kmPorMes)){
+      const mesesAte = Math.min(120, v.falta / kmPorMes);
+      const previsao = new Date();
+      previsao.setDate(previsao.getDate() + Math.round(mesesAte * 30));
+      return { data: previsao, vencida: false, origem: 'estimada' };
+    }
+  }
+  return null;
+}
+
+function previsaoMesAno(v){
+  const p = calcularPrevisaoTroca(v);
+  if(!p || p.vencida) return null;
+  return p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0');
+}
+
+function prevRepPopularPrevisao(lista){
+  const meses = new Set();
+  let temVencidas = false;
+  lista.forEach(v => {
+    const p = calcularPrevisaoTroca(v);
+    if(!p) return;
+    if(p.vencida){ temVencidas = true; return; }
+    meses.add(p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0'));
+  });
+  const sel = $('prevRepFilterPrevisao');
+  if(!sel) return;
+  const mesesOrd = Array.from(meses).sort();
+  let html = '<option value="">Todas</option>';
+  if(temVencidas) html += '<option value="__vencidas__">⚠ Vencidas (atrasadas)</option>';
+  html += mesesOrd.map(ym => {
+    const selAttr = (prevRepFiltroPrevisao === ym) ? ' selected' : '';
+    return `<option value="${escapeAttr(ym)}"${selAttr}>${escapeHtml(formatarMesAno(ym))}</option>`;
+  }).join('');
+  sel.innerHTML = html;
+  sel.value = prevRepFiltroPrevisao;
+}
+
+function prevRepAplicarFiltros(lista){
+  return lista.filter(v => {
+    if(prevRepFiltroOleo && v.statusOleo !== prevRepFiltroOleo) return false;
+
+    if(prevRepFiltroPrevisao){
+      const p = calcularPrevisaoTroca(v);
+      if(prevRepFiltroPrevisao === '__vencidas__'){
+        if(!p || !p.vencida) return false;
+      } else {
+        if(!p || p.vencida) return false;
+        const ym = p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0');
+        if(ym !== prevRepFiltroPrevisao) return false;
+      }
+    }
+
+    if(prevRepFiltroKm){
+      if(prevRepFiltroKm === 'sem_dados'){
+        if(v.kmAtual != null && v.kmProxima != null) return false;
+      } else {
+        if(v.falta == null || v.kmAtual == null || v.kmProxima == null) return false;
+        if(prevRepFiltroKm === 'atrasado' && v.falta > 0) return false;
+        if(prevRepFiltroKm === 'curto' && (v.falta <= 0 || v.falta > 2000)) return false;
+        if(prevRepFiltroKm === 'medio' && (v.falta <= 2000 || v.falta > 5000)) return false;
+        if(prevRepFiltroKm === 'longo' && v.falta <= 5000) return false;
+      }
+    }
+
+    if(prevRepFiltroBusca){
+      const q = normalizeStr(prevRepFiltroBusca);
+      if(!normalizeStr(v.prefixo).includes(q) && !normalizeStr(v.placa).includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function prevRepRenderKpis(lista){
+  const total = lista.length;
+  const atrasadas = lista.filter(v => v.statusOleo === 'vermelho').length;
+  const proximas = lista.filter(v => v.statusOleo === 'amarelo').length;
+  const emDia = lista.filter(v => v.statusOleo === 'verde').length;
+  const semDados = lista.filter(v => v.statusOleo === 'vazio').length;
+  const semPrevisao = lista.filter(v => !calcularPrevisaoTroca(v)).length;
+  $('prevReportKpis').innerHTML = `
+    <div class="report-kpi kpi-total"><div class="kpi-label">Total</div><div class="kpi-value">${total}</div></div>
+    <div class="report-kpi kpi-pend"><div class="kpi-label">🔴 Atrasadas</div><div class="kpi-value" style="color:var(--vermelho);">${atrasadas}</div></div>
+    <div class="report-kpi kpi-qnt"><div class="kpi-label">🟡 Próximas</div><div class="kpi-value" style="color:var(--amber);">${proximas}</div></div>
+    <div class="report-kpi kpi-final"><div class="kpi-label">🟢 Em dia</div><div class="kpi-value" style="color:var(--verde);">${emDia}</div></div>
+    <div class="report-kpi kpi-aprov"><div class="kpi-label">— Sem dados</div><div class="kpi-value" style="color:var(--text-faint);">${semDados}</div></div>
+    <div class="report-kpi kpi-dist"><div class="kpi-label">Sem previsão</div><div class="kpi-value">${semPrevisao}</div></div>
+  `;
+}
+
+function prevRepRenderTabela(){
+  const base = PREV_VIATURAS.slice();
+  const dados = prevRepAplicarFiltros(base);
+  prevRepRenderKpis(dados);
+
+  const partes = [];
+  if(prevRepFiltroOleo){
+    const labels = { vermelho: 'Atrasadas', amarelo: 'Próximas', verde: 'Em dia', vazio: 'Sem dados' };
+    partes.push('Situação: ' + labels[prevRepFiltroOleo]);
+  }
+  if(prevRepFiltroPrevisao){
+    if(prevRepFiltroPrevisao === '__vencidas__') partes.push('Previsão: Vencidas');
+    else partes.push('Previsão: ' + formatarMesAno(prevRepFiltroPrevisao));
+  }
+  if(prevRepFiltroKm){
+    const labels = { atrasado: 'Atrasado', curto: '0–2.000', medio: '2.000–5.000', longo: '>5.000', sem_dados: 'Sem dados' };
+    partes.push('KM: ' + labels[prevRepFiltroKm]);
+  }
+  if(prevRepFiltroBusca) partes.push('Busca: "' + prevRepFiltroBusca + '"');
+
+  $('prevRepFilterResumo').innerHTML =
+    '<b>Filtros:</b> ' + (partes.length ? partes.map(escapeHtml).join(' · ') : 'nenhum') +
+    ' · <b>Exibindo:</b> ' + dados.length + ' de ' + base.length + ' viaturas';
+
+  // Ordena pela data prevista (mais urgente primeiro; sem previsão vai pro fim)
+  const ordenado = dados.slice().sort((a, b) => {
+    const pa = calcularPrevisaoTroca(a);
+    const pb = calcularPrevisaoTroca(b);
+    const ta = pa ? pa.data.getTime() : Infinity;
+    const tb = pb ? pb.data.getTime() : Infinity;
+    if(ta !== tb) return ta - tb;
+    return a.prefixo.localeCompare(b.prefixo);
+  });
+
+  const hoje = new Date();
+  $('prevReportBody').innerHTML = ordenado.length === 0
+    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhuma viatura encontrada com os filtros atuais</td></tr>'
+    : ordenado.map(v => {
+        const p = calcularPrevisaoTroca(v);
+        let prevTxt = '—';
+        let prevCor = 'var(--text-faint)';
+        if(p){
+          if(p.vencida){ prevTxt = '⚠ VENCIDA'; prevCor = 'var(--vermelho)'; }
+          else {
+            prevTxt = p.data.toLocaleDateString('pt-BR');
+            if(p.origem === 'estimada') prevTxt += ' (est.)';
+            prevCor = p.data < new Date(hoje.getTime() + 30*86400000) ? 'var(--amber)' : 'var(--text)';
+          }
+        }
+        const faltaTxt = v.falta != null
+          ? (v.falta <= 0 ? '+' + Math.abs(v.falta).toLocaleString('pt-BR') + ' passou' : v.falta.toLocaleString('pt-BR') + ' km')
+          : '—';
+        const faltaCor = v.falta != null && v.falta <= 0 ? 'var(--vermelho)'
+                      : (v.falta != null && v.falta <= 2000 ? 'var(--amber)' : 'var(--text-dim)');
+        const statusOleoLabel = { vermelho: '🔴 Atrasada', amarelo: '🟡 Próxima', verde: '🟢 Em dia', vazio: '— Sem dados' }[v.statusOleo] || '—';
+        const statusOleoCor = { vermelho: 'var(--vermelho)', amarelo: 'var(--amber)', verde: 'var(--verde)' }[v.statusOleo] || 'var(--text-faint)';
+        return `<tr>
+          <td class="v">${escapeHtml(v.prefixo)}</td>
+          <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${escapeHtml(v.placa || '—')}</td>
+          <td style="font-size:11px;color:var(--text-dim);">${escapeHtml(v.situacao || '—')}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${v.kmAtual != null ? v.kmAtual.toLocaleString('pt-BR') : '—'}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${v.kmProxima != null ? v.kmProxima.toLocaleString('pt-BR') : '—'}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:${faltaCor};">${faltaTxt}</td>
+          <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${prevCor};">${prevTxt}</td>
+          <td style="font-size:11px;color:${statusOleoCor};">${statusOleoLabel}</td>
+          <td style="font-size:11px;color:var(--text-dim);">${escapeHtml(formatarGarantiaPrev(v.garantia) || '—')}</td>
+        </tr>`;
+      }).join('');
+}
+
+function abrirRelatorioPreventiva(){
+  if(!PREV_VIATURAS.length){
+    alert('Carregando dados… Aguarde um instante e tente novamente.');
+    loadDataPreventiva();
+    return;
+  }
+  document.body.classList.add('relatorio-aberto');
+  prevRepFiltroOleo = '';
+  prevRepFiltroPrevisao = '';
+  prevRepFiltroKm = '';
+  prevRepFiltroBusca = '';
+  $('prevRepFilterOleo').value = '';
+  $('prevRepFilterKm').value = '';
+  $('prevRepFilterBusca').value = '';
+
+  prevRepPopularPrevisao(PREV_VIATURAS);
+
+  const agora = new Date();
+  $('prevReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
+
+  const selOleo = $('prevRepFilterOleo');
+  const selPrev = $('prevRepFilterPrevisao');
+  const selKm = $('prevRepFilterKm');
+  const inpBusca = $('prevRepFilterBusca');
+  const btnLimpar = $('prevRepFilterLimpar');
+
+  if(selOleo && !selOleo.dataset.bound){
+    selOleo.dataset.bound = '1';
+    selOleo.addEventListener('change', () => { prevRepFiltroOleo = selOleo.value; prevRepRenderTabela(); });
+  }
+  if(selPrev && !selPrev.dataset.bound){
+    selPrev.dataset.bound = '1';
+    selPrev.addEventListener('change', () => { prevRepFiltroPrevisao = selPrev.value; prevRepRenderTabela(); });
+  }
+  if(selKm && !selKm.dataset.bound){
+    selKm.dataset.bound = '1';
+    selKm.addEventListener('change', () => { prevRepFiltroKm = selKm.value; prevRepRenderTabela(); });
+  }
+  if(inpBusca && !inpBusca.dataset.bound){
+    inpBusca.dataset.bound = '1';
+    inpBusca.addEventListener('input', debounce(() => { prevRepFiltroBusca = inpBusca.value; prevRepRenderTabela(); }, 180));
+  }
+  if(btnLimpar && !btnLimpar.dataset.bound){
+    btnLimpar.dataset.bound = '1';
+    btnLimpar.addEventListener('click', () => {
+      prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
+      selOleo.value = ''; selPrev.value = ''; selKm.value = ''; inpBusca.value = '';
+      prevRepRenderTabela();
+    });
+  }
+
+  prevRepRenderTabela();
+  $('prevReportModal').style.display = 'flex';
+}
+
 let USUARIOS_CACHE = [];
 async function carregarUsuarios(){
   if(!podeVerUsuarios()) return;
@@ -3687,7 +4001,7 @@ function iniciarPolling(){
   if(_pollHandle) clearInterval(_pollHandle);
   _pollHandle = setInterval(async () => {
     if(document.hidden) return;
-    const modalOpen = ['editModal','reportModal','manutReportModal','actionModal','userModal','changePassModal','sucessoModal'].some(id => $(id).style.display === 'flex');
+    const modalOpen = ['editModal','reportModal','manutReportModal','prevReportModal','actionModal','userModal','changePassModal','sucessoModal'].some(id => { const el = $(id); return el && el.style.display === 'flex'; });
     const selFocused = document.activeElement && ['SELECT','INPUT','TEXTAREA'].includes(document.activeElement.tagName);
     if(modalOpen || selFocused) return;
     if(activeView === 'os' && temPermissao('ver_os')) await loadDataOS();
@@ -3842,6 +4156,20 @@ $('prevClearFilterBtn').addEventListener('click', () => {
   renderPreventiva();
 });
 
+// Relatório de Manutenção Preventiva
+$('prevReportBtn').addEventListener('click', () => { if(!temPermissao('ver_preventiva')){ alert('Sem permissão.'); return; } abrirRelatorioPreventiva(); });
+$('prevReportClose').addEventListener('click', () => {
+  document.body.classList.remove('relatorio-aberto');
+  $('prevReportModal').style.display = 'none';
+});
+$('prevReportPrint').addEventListener('click', () => window.print());
+$('prevReportModal').addEventListener('click', e => {
+  if(e.target.id === 'prevReportModal'){
+    document.body.classList.remove('relatorio-aberto');
+    $('prevReportModal').style.display = 'none';
+  }
+});
+
 $('pf-busca').addEventListener('input', debounce(_handlePfBuscaInput, 120));
 $('pf-busca').addEventListener('focus', () => {
   if($('pf-busca').value.trim()) renderDropdownViaturas();
@@ -3867,7 +4195,6 @@ $('mm-save').addEventListener('click', salvarManut);
 $('mm-cancel').addEventListener('click', cancelarFormManut);
 $('mm-status').addEventListener('change', () => trocarCampoLocal('mm-local-wrap','mm-status',false));
 $('me-status').addEventListener('change', () => trocarCampoLocal('me-local-wrap','me-status',true, processoAtual ? processoAtual.tipo : undefined));
-// [ATUALIZADO] "Local final" sempre em dropdown → reagir a mudança de status re-renderizando o select
 $('mf-status').addEventListener('change', () => montarCampoLocalFinal());
 $('manutReportBtn').addEventListener('click', () => { if(!temPermissao('ver_manutencao')){ alert('Sem permissão.'); return; } abrirRelatorioManut(); });
 $('manutReportClose').addEventListener('click', () => {
@@ -3906,7 +4233,7 @@ document.addEventListener('keydown', e => {
     fecharDropdownViaturas();
     return;
   }
-  ['editModal','reportModal','manutReportModal','actionModal','userModal'].forEach(id => { const el = $(id); if(el && el.style.display === 'flex') el.style.display = 'none'; });
+  ['editModal','reportModal','manutReportModal','prevReportModal','actionModal','userModal'].forEach(id => { const el = $(id); if(el && el.style.display === 'flex') el.style.display = 'none'; });
 });
 
 function startApp(){
