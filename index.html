@@ -934,6 +934,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
               </select>
             </label>
             <label>Local (opcional)<div class="local-field-wrap" id="me-local-wrap" data-valor=""></div></label>
+            <label class="full">Solicitante<input type="text" id="me-solicitante" placeholder="Quem solicitou a movimentação"></label>
             <label class="full">Informante<input type="text" id="me-informante" placeholder="Quem informou este evento"></label>
             <label class="full">Detalhes
               <textarea id="me-detalhes" rows="3" placeholder="Descreva o evento…"></textarea>
@@ -1304,7 +1305,7 @@ const PERM_GRUPOS = {
 };
 
 const LOCAIS_OFICINA = [
-  'FIX CAR','VIDROCAR','AUTO MIX','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
+  'FIX CAR','VIDROCAR','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
   'MULTIRADIUS','RENOBAN','XINGO','PAULISTA','LEANDRO TRUCK','CAXANGA',
   'M. SOBRAL','ARIBE MOTOS','AC MOTOS',
   'SR. AROLDO','MARDISA','MORAUTO','SANVEL',
@@ -2376,8 +2377,8 @@ function lerLocalForm(wrapId){
 }
 
 let MANUT_EVENTOS = [];
-let MANUT_FILTRO_STATUS = 'abertos'; // ← Mude de 'todas' para 'abertos'
-let MANUT_FILTRO_TIPO = ''; 
+let MANUT_FILTRO_STATUS = 'abertos';
+let MANUT_FILTRO_TIPO = '';
 let activeManutTab = 'registros';
 let modoManutForm = 'criar';
 let processoAtual = null;
@@ -2792,7 +2793,7 @@ function renderManut(){
   renderSummaryManut();
   renderManutGrid();
   const clearBtn = $('manutClearFilterBtn');
-  if(clearBtn) clearBtn.style.display = (MANUT_FILTRO_STATUS !== 'todas' || MANUT_FILTRO_TIPO) ? 'inline-block' : 'none';
+  if(clearBtn) clearBtn.style.display = (MANUT_FILTRO_STATUS !== 'abertos' || MANUT_FILTRO_TIPO) ? 'inline-block' : 'none';
 }
 
 let _conversaoPendenteId = null;
@@ -3915,6 +3916,9 @@ function abrirFormEvento(p){
   $('me-data').value = agoraDatetimeLocal();
   $('me-status').value = '';
   montarCampoLocal('me-local-wrap', p.ultimo ? p.ultimo.local : '', $('me-status').value, true, tipoProc);
+  
+  $('me-solicitante').value = p.solicitante || (p.entrada ? p.entrada.solicitante : '');
+  
   $('me-informante').value = '';
   $('me-detalhes').value = '';
   $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
@@ -3940,6 +3944,7 @@ function limparFormManut(){
   $('me-data').value = agoraDatetimeLocal();
   $('me-status').value = '';
   montarCampoLocal('me-local-wrap', '', '', true);
+  $('me-solicitante').value = '';
   $('me-informante').value = '';
   $('me-detalhes').value = '';
 
@@ -4003,13 +4008,14 @@ async function salvarEventoManut(){
   const data       = $('me-data').value;
   const status     = $('me-status').value;
   const local      = lerLocalForm('me-local-wrap');
+  const solicitante= $('me-solicitante').value.trim();
   const informante = $('me-informante').value.trim();
   const detalhes   = $('me-detalhes').value.trim();
   if(!data){ err.textContent = 'Informe a data.'; err.style.display='block'; return; }
   if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
   btn.disabled = true; btn.textContent = 'Salvando…';
   const procId = processoAtual.id;
-  const r = await apiManut('adicionarEvento', { id: procId, tipo, data, status, local, informante, detalhes });
+  const r = await apiManut('adicionarEvento', { id: procId, tipo, data, status, local, solicitante, informante, detalhes });
   btn.disabled = false; btn.textContent = 'Salvar evento';
   if(!r.ok){ err.textContent = r.error || 'Erro ao salvar.'; err.style.display = 'block'; return; }
   _ultimoEventoAdicionado[procId] = Date.now();
