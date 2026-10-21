@@ -259,7 +259,6 @@ input[type=datetime-local]:focus, input[type=date]:focus, input[type=time]:focus
 .veh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;padding:14px 18px 18px;}
 .veh-card{background:var(--surface);border:2px solid transparent;border-radius:11px;padding:12px 13px;overflow:hidden;-webkit-touch-callout:none;}
 .veh-name{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-
 .svc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 30px 10px 10px;border-top:1px solid var(--border);border-left:4px solid transparent;position:relative;min-height:56px;}
 .svc-row:first-of-type{border-top:none;}
 .svc-left{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;}
@@ -278,7 +277,6 @@ select.stage-select:hover{border-color:var(--amber);}
 .edit-btn:active{transform:scale(.92);}
 .edit-btn svg{width:12px;height:12px;display:block;}
 .empty-col{font-size:12px;color:var(--text-faint);padding:10px 6px;text-align:center;}
-
 .addform{display:none;grid-template-columns:repeat(6, 1fr);gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px;align-items:center;}
 .addform.open{display:grid;}
 .addform input, .addform select{width:100%;min-width:0;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:13px;touch-action:manipulation;}
@@ -457,7 +455,6 @@ select.stage-select:hover{border-color:var(--amber);}
 .user-meta{font-size:10.5px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;}
 .user-actions{display:flex;gap:6px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--border);}
 .user-actions .btn{font-size:12px;padding:7px 12px;flex:1;min-width:0;text-align:center;}
-
 .report-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;width:100%;max-width:1200px;display:flex;flex-direction:column;gap:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);max-height:90dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .report-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
 .report-header h2{font-family:'Rajdhani',sans-serif;font-size:22px;margin:0;color:var(--amber);letter-spacing:.02em;}
@@ -517,7 +514,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 .local-field-wrap select:focus{outline:1px solid var(--amber);}
 .local-field-wrap input:disabled{opacity:.55;cursor:not-allowed;background:var(--surface);}
 .local-hint{font-size:10px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;}
-
 .pf-dropdown-wrap{position:relative;width:100%;}
 .pf-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:60;display:none;box-shadow:0 12px 32px rgba(0,0,0,.55);}
 .pf-dropdown.open{display:block;}
@@ -527,7 +523,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 .pf-dropdown-item .pf-di-prefix{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:15px;color:var(--text);letter-spacing:.02em;}
 .pf-dropdown-item .pf-di-placa{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);white-space:nowrap;}
 .pf-dropdown-empty{padding:14px;text-align:center;color:var(--text-faint);font-size:12px;font-style:italic;}
-
 .prev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;}
 @media (max-width:600px){.prev-grid{grid-template-columns:1fr;}}
 .prev-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;-webkit-touch-callout:none;}
@@ -585,9 +580,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 .prev-info-card .linha b{color:var(--text);font-weight:600;font-family:'IBM Plex Mono',monospace;}
 .prev-form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
 .prev-form-actions .btn{padding:10px 18px;font-size:14px;}
-
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
-
 @media print{
   html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; color: #000 !important; min-height: 0 !important; height: auto !important; }
   .topbar, .sidebar, .sidebar-backdrop { display: none !important; }
@@ -880,9 +873,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
         <div class="inline-form">
           <h2 id="manutFormTitle">🛠 Nova entrada</h2>
           <p class="help" id="manutFormHelp">Ao salvar, um processo com ID único será criado.</p>
-
           <div id="procInfoBox" class="proc-info-box" style="display:none;"></div>
-
           <div class="inline-form-grid" id="formCriar">
             <label>Tipo *
               <select id="mm-tipo">
@@ -915,7 +906,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
               <textarea id="mm-detalhes" rows="3" placeholder="Descreva…"></textarea>
             </label>
           </div>
-
           <div class="inline-form-grid" id="formEvento" style="display:none;">
             <label>Tipo de evento
               <select id="me-tipo">
@@ -940,7 +930,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
               <textarea id="me-detalhes" rows="3" placeholder="Descreva o evento…"></textarea>
             </label>
           </div>
-
           <div class="inline-form-grid" id="formFinalizar" style="display:none;">
             <label>Data final<input type="datetime-local" id="mf-data"></label>
             <label>Status final
@@ -957,9 +946,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
               <textarea id="mf-detalhes" rows="3" placeholder="Descreva o serviço realizado…"></textarea>
             </label>
           </div>
-
           <p id="mm-error" class="modal-error"></p>
-
           <div class="inline-form-actions">
             <button class="btn danger" id="mm-delete" style="display:none;">Excluir processo</button>
             <div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;">
@@ -1255,7 +1242,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
     </div>
   </div>
 </div>
-
 <script>
 // ═══════════════════════════════════════════════════════════════════════════
 // CONFIG
@@ -1315,6 +1301,8 @@ const LOCAIS_OFICINA = [
 const LOCAIS_UNIDADE = [
   '1° GBM/1° SGBM','2° SGBM','2° GBM','3° GBM','4° GBM','5° GBM','6° GBM','7° GBM','GBS'
 ];
+// CSMP substitui ALMOXARIFADO — exibido como "Almoxarifado" nos selects,
+// mas gravado como CSMP na planilha/backends
 const LOCAIS_DIRETORIA = [
   'DOP','DEP','DAT','DLOG','DGP','DPLAN','ASSIN','ASTEI','ASTEA','ASCOM','ASTINF',
   'CSMP','SAT','GABINETE DO COMANDO','CIOSP','COBOM','CORREGEDORIA','CANIL'
@@ -1381,7 +1369,7 @@ setInterval(() => {
   _pingVersao(VIATURAS_APPS_SCRIPT_URL);
   _pingVersao(MANUT_APPS_SCRIPT_URL);
   _pingVersao(PREVENTIVA_APPS_SCRIPT_URL);
-}, 2 * 60 * 1000);
+}, 5 * 60 * 1000);
 
 function normalizeStr(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
 function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
@@ -2056,6 +2044,9 @@ function openEditModal(recordId){
 }
 function closeEditModal(){ editingRecordId = null; $('editModal').style.display = 'none'; }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// VIATURAS
+// ═══════════════════════════════════════════════════════════════════════════
 const MOTIVOS_BAIXA = ['Sinistro','Manutenção'];
 const CACHE_KEY = 'deman_cache_viaturas_v1';
 let VIATURAS = []; let LOCAIS = []; let LOCAIS_DIRETORIAS = []; let activeFilter = 'todas';
@@ -2143,9 +2134,8 @@ function htmlVehRow(v, localCard, mapaProc){
 
 function htmlLocalCard(nome, viaturas, tipo, mapaProc){
   const qtd = viaturas.length; const label = qtd === 1 ? '1 viatura' : qtd+' viaturas';
-  // ══════════ ALTERAÇÃO CSMP ══════════
+  // CSMP é exibido como "CSMP (Almoxarifado)" no cabeçalho
   const labelNome = (nome === 'CSMP') ? 'CSMP (Almoxarifado)' : nome;
-  // ═══════════════════════════════════
   const bodyHtml = qtd === 0 ? `<div class="local-empty">Nenhuma viatura neste local</div>` : viaturas.sort((a,b)=>a.prefixo.localeCompare(b.prefixo)).map(v => htmlVehRow(v, nome, mapaProc)).join('');
   return `<div class="local-card ${tipo||''}"><div class="local-head"><div class="local-name">${escapeHtml(labelNome)}</div><div class="local-count">${label}</div></div><div class="local-body">${bodyHtml}</div></div>`;
 }
@@ -2155,14 +2145,25 @@ function renderLocalGridViaturas(){
   const matchesQ = v => !q || normalizeStr(v.prefixo).includes(q) || normalizeStr(v.gbm).includes(q);
   const mapaProc = mapaProcViaturaAbertos();
 
-  if(activeFilter === 'baixadas'){ const baixadas = VIATURAS.filter(v => v.origem === 'baixada').filter(matchesQ); if(baixadas.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura baixada.</div>'; return; } container.innerHTML = htmlLocalCard('BAIXADAS', baixadas, 'baixadas', mapaProc); bindActionsViaturas(); return; }
-  if(activeFilter === 'reservas'){ const reservas = VIATURAS.filter(v => v.origem === 'reserva').filter(matchesQ); if(reservas.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura em reserva (DEMAN).</div>'; return; } container.innerHTML = htmlLocalCard('DEMAN (Reservas)', reservas, 'reserva', mapaProc); bindActionsViaturas(); return; }
+  if(activeFilter === 'baixadas'){
+    const baixadas = VIATURAS.filter(v => v.origem === 'baixada').filter(matchesQ);
+    if(baixadas.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura baixada.</div>'; return; }
+    container.innerHTML = htmlLocalCard('BAIXADAS', baixadas, 'baixadas', mapaProc); bindActionsViaturas(); return;
+  }
+  if(activeFilter === 'reservas'){
+    const reservas = VIATURAS.filter(v => v.origem === 'reserva').filter(matchesQ);
+    if(reservas.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura em reserva (DEMAN).</div>'; return; }
+    container.innerHTML = htmlLocalCard('DEMAN (Reservas)', reservas, 'reserva', mapaProc); bindActionsViaturas(); return;
+  }
   if(activeFilter === 'diretorias'){
     const ativasDir = VIATURAS.filter(v => v.origem === 'ativa' && ehDiretoria(v.gbm) && matchesQ(v));
     if(ativasDir.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura em diretorias.</div>'; return; }
-    const porLocal = {}; LOCAIS_DIRETORIAS.forEach(l => porLocal[l] = []);
+    const listaDir = LOCAIS_DIRETORIAS.length ? LOCAIS_DIRETORIAS : LOCAIS_DIRETORIA;
+    const porLocal = {}; listaDir.forEach(l => porLocal[l] = []);
     ativasDir.forEach(v => { const key = v.gbm || '(Sem local)'; if(!porLocal[key]) porLocal[key] = []; porLocal[key].push(v); });
-    let html = ''; LOCAIS_DIRETORIAS.forEach(local => { const lista = porLocal[local] || []; if(q && lista.length === 0) return; html += htmlLocalCard(local, lista, '', mapaProc); });
+    // iteração dinâmica: inclui locais órfãos no final
+    const ordem = [...listaDir, ...Object.keys(porLocal).filter(k => !listaDir.includes(k))];
+    let html = ''; ordem.forEach(local => { const lista = porLocal[local] || []; if(q && lista.length === 0) return; html += htmlLocalCard(local, lista, '', mapaProc); });
     container.innerHTML = html; bindActionsViaturas(); return;
   }
   if(activeFilter === 'ativas'){
@@ -2172,7 +2173,8 @@ function renderLocalGridViaturas(){
     const reservas = naoBaixadas.filter(v => v.origem === 'reserva');
     const porLocal = {}; LOCAIS.forEach(l => porLocal[l] = []);
     ativas.forEach(v => { const key = v.gbm || '(Sem local)'; if(!porLocal[key]) porLocal[key] = []; porLocal[key].push(v); });
-    const ordem = [...LOCAIS]; if(porLocal['(Sem local)']) ordem.push('(Sem local)');
+    const ordem = [...LOCAIS, ...Object.keys(porLocal).filter(k => !LOCAIS.includes(k) && k !== '(Sem local)')];
+    if(porLocal['(Sem local)']) ordem.push('(Sem local)');
     let html = ''; ordem.forEach(local => { const lista = porLocal[local] || []; if(q && lista.length === 0) return; html += htmlLocalCard(local, lista, '', mapaProc); });
     if(reservas.length > 0) html += htmlLocalCard('DEMAN (Reservas)', reservas, 'reserva', mapaProc);
     container.innerHTML = html; bindActionsViaturas(); return;
@@ -2180,7 +2182,8 @@ function renderLocalGridViaturas(){
   const ativas = VIATURAS.filter(v => v.origem === 'ativa' && !ehDiretoria(v.gbm));
   const porLocal = {}; LOCAIS.forEach(l => porLocal[l] = []);
   ativas.filter(matchesQ).forEach(v => { const key = v.gbm || '(Sem local)'; if(!porLocal[key]) porLocal[key] = []; porLocal[key].push(v); });
-  const ordem = [...LOCAIS]; if(porLocal['(Sem local)']) ordem.push('(Sem local)');
+  const ordem = [...LOCAIS, ...Object.keys(porLocal).filter(k => !LOCAIS.includes(k) && k !== '(Sem local)')];
+  if(porLocal['(Sem local)']) ordem.push('(Sem local)');
   let html = ''; ordem.forEach(local => { const lista = porLocal[local] || []; if(q && lista.length === 0) return; html += htmlLocalCard(local, lista, '', mapaProc); });
   if(html.trim() === ''){ container.innerHTML = '<div class="empty">Nenhuma viatura encontrada.</div>'; return; }
   container.innerHTML = html; bindActionsViaturas();
@@ -2212,16 +2215,18 @@ function abrirModal(titulo, camposHtml, onConfirm, permissaoNecessaria){
   confirm.addEventListener('click', handler); cancel.addEventListener('click', fechar);
 }
 function htmlOpcoesLocais(selecionado){
-  // ══════════ ALTERAÇÃO CSMP ══════════
   function opt(l){
     const sel = (selecionado && normalizeStr(l) === normalizeStr(selecionado)) ? ' selected' : '';
-    const label = (l === 'CSMP') ? 'Almoxarifado' : l;
+    // CSMP é exibido como "Almoxarifado" mas o value permanece CSMP.
+    // Fallback legado: aceita ALMOXARIFADO antigo sem quebrar a UI.
+    const label = (l === 'CSMP' || l === 'ALMOXARIFADO') ? 'Almoxarifado' : l;
     return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(label)}</option>`;
   }
-  // ═══════════════════════════════════
   let html = '';
-  if(LOCAIS.length > 0) html += `<optgroup label="GBMs / SGBM / GBS">${LOCAIS.map(opt).join('')}</optgroup>`;
-  if(LOCAIS_DIRETORIAS.length > 0) html += `<optgroup label="Diretorias">${LOCAIS_DIRETORIAS.map(opt).join('')}</optgroup>`;
+  const unidades   = LOCAIS.length         ? LOCAIS         : LOCAIS_UNIDADE;
+  const diretorias = LOCAIS_DIRETORIAS.length ? LOCAIS_DIRETORIAS : LOCAIS_DIRETORIA;
+  if(unidades.length > 0)   html += `<optgroup label="GBMs / SGBM / GBS">${unidades.map(opt).join('')}</optgroup>`;
+  if(diretorias.length > 0) html += `<optgroup label="Diretorias">${diretorias.map(opt).join('')}</optgroup>`;
   return html;
 }
 function htmlOpcoesMotivo(){ return MOTIVOS_BAIXA.map(m => `<option value="${escapeAttr(m)}">${escapeHtml(m)}</option>`).join(''); }
@@ -2334,19 +2339,20 @@ function _htmlInputLocal(idCampo, valorAtual){
 }
 function _htmlSelectLocal(idCampo, valorAtual){
   const vAtual = String(valorAtual||'').trim().toUpperCase();
-  // ══════════ ALTERAÇÃO CSMP ══════════
   function opt(l){
     const sel = (vAtual && vAtual === l.toUpperCase()) ? ' selected' : '';
-    const label = (l === 'CSMP') ? 'Almoxarifado' : l;
+    // CSMP é exibido como "Almoxarifado" mas o value permanece CSMP.
+    const label = (l === 'CSMP' || l === 'ALMOXARIFADO') ? 'Almoxarifado' : l;
     return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(label)}</option>`;
   }
-  // ═══════════════════════════════════
   const selVazio = vAtual ? '' : ' selected';
+  const unidades   = LOCAIS.length         ? LOCAIS         : LOCAIS_UNIDADE;
+  const diretorias = LOCAIS_DIRETORIAS.length ? LOCAIS_DIRETORIAS : LOCAIS_DIRETORIA;
   return `<select id="${idCampo}" autocomplete="off">
     <option value=""${selVazio}>— Selecione o local —</option>
     <optgroup label="Reserva">${opt(LOCAL_RESERVA)}</optgroup>
-    <optgroup label="Unidades">${LOCAIS_UNIDADE.map(opt).join('')}</optgroup>
-    <optgroup label="Diretorias">${LOCAIS_DIRETORIA.map(opt).join('')}</optgroup>
+    <optgroup label="Unidades">${unidades.map(opt).join('')}</optgroup>
+    <optgroup label="Diretorias">${diretorias.map(opt).join('')}</optgroup>
   </select>
   <span class="local-hint">Deixe em branco para retornar ao local de origem.</span>`;
 }
@@ -2388,6 +2394,9 @@ function lerLocalForm(wrapId){
   return String(input.value || '').trim().toUpperCase();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// MANUTENÇÃO — parte 1: estado e helpers
+// ═══════════════════════════════════════════════════════════════════════════
 let MANUT_EVENTOS = [];
 let MANUT_FILTRO_STATUS = 'abertos';
 let MANUT_FILTRO_TIPO = '';
@@ -2396,7 +2405,13 @@ let modoManutForm = 'criar';
 let processoAtual = null;
 let sidebarMovExpanded = true;
 const DESFAZER_JANELA_MS = 30000;
-const _ultimoEventoAdicionado = {};
+const _DESFAZER_STORAGE_KEY = 'deman_ultimo_evento_v1';
+const _ultimoEventoAdicionado = (function(){
+  try{ return JSON.parse(sessionStorage.getItem(_DESFAZER_STORAGE_KEY) || '{}'); }catch(e){ return {}; }
+})();
+function _persistirDesfazer(){
+  try{ sessionStorage.setItem(_DESFAZER_STORAGE_KEY, JSON.stringify(_ultimoEventoAdicionado)); }catch(e){}
+}
 let _desfazerTimer = null;
 let manutRepStatusFiltro = '';
 
@@ -2566,11 +2581,7 @@ function processosFiltrados(){
   const q = normalizeStr($('manutSearch').value);
   const grupos = agruparPorProcesso();
   let ids = Object.keys(grupos);
-
-  if(MANUT_FILTRO_TIPO){
-    ids = ids.filter(id => (grupos[id].tipo || TIPO_VIATURA) === MANUT_FILTRO_TIPO);
-  }
-
+  if(MANUT_FILTRO_TIPO){ ids = ids.filter(id => (grupos[id].tipo || TIPO_VIATURA) === MANUT_FILTRO_TIPO); }
   ids.sort((a, b) => {
     const ga = grupos[a], gb = grupos[b];
     if(ga.aberto !== gb.aberto) return ga.aberto ? -1 : 1;
@@ -2579,12 +2590,10 @@ function processosFiltrados(){
     const pa = parseDataManut(da), pb = parseDataManut(db);
     return (pb ? pb.getTime() : 0) - (pa ? pa.getTime() : 0);
   });
-
   if(MANUT_FILTRO_STATUS === 'abertos') ids = ids.filter(id => grupos[id].aberto);
   else if(MANUT_FILTRO_STATUS === 'finalizados') ids = ids.filter(id => !grupos[id].aberto);
   else if(MANUT_FILTRO_STATUS === 'baixadas') ids = ids.filter(id => statusClasseManut(grupos[id].ultimo ? grupos[id].ultimo.status : '') === 'baixada');
   else if(MANUT_FILTRO_STATUS === 'agendamentos') ids = ids.filter(id => grupos[id].tipo === TIPO_AGENDAMENTO && grupos[id].aberto);
-
   if(q){
     ids = ids.filter(id => {
       const g = grupos[id];
@@ -2598,7 +2607,6 @@ function processosFiltrados(){
       );
     });
   }
-
   return ids.map(id => grupos[id]);
 }
 
@@ -2772,6 +2780,7 @@ function renderManutGrid(){
       btn.disabled = false;
       if(!r.ok){ alert('Erro: ' + r.error); return; }
       delete _ultimoEventoAdicionado[p.id];
+      _persistirDesfazer();
       try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
       await loadDataManut();
     });
@@ -2887,7 +2896,6 @@ function renderRelatorioManutDetalhado(){
   const mes = $('manutReportMonth').value;
   const grupos = agruparPorProcesso();
   let procs = Object.values(grupos);
-
   if(mes){
     procs = procs.filter(p => {
       const d = parseDataManut(p.entrada ? p.entrada.data : '');
@@ -2973,6 +2981,9 @@ function renderRelatorioManutPorMes(){
   }).join('');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PREVENTIVA
+// ═══════════════════════════════════════════════════════════════════════════
 const STORAGE_KEY_PREV = 'deman_cache_preventiva_v1';
 const PREV_CACHE_TTL   = 15 * 60 * 1000;
 let PREV_VIATURAS = [];
@@ -3229,9 +3240,18 @@ async function salvarPreventivaForm(){
     payload.kmTroca = kmTrocaRaw;
     payload.osTroca = osTroca;
   }
-  var r = await apiPrev('salvarPreventiva', payload);
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(!r.ok){ err.textContent = r.error || 'Erro ao salvar.'; err.style.display = 'block'; return; }
+  let r;
+  try {
+    r = await apiPrev('salvarPreventiva', payload);
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar';
+  }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
   var resumo = [];
   if(r.acoes && r.acoes.km){
     var a = r.acoes.km;
@@ -3478,6 +3498,9 @@ function abrirRelatorioPreventiva(){
   _abrirReportModal('prevReportModal');
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// USUÁRIOS
+// ═══════════════════════════════════════════════════════════════════════════
 let USUARIOS_CACHE = [];
 async function carregarUsuarios(){
   if(!podeVerUsuarios()) return;
@@ -3525,6 +3548,9 @@ function renderUsuarios(){
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// POLLING + VISIBILITY
+// ═══════════════════════════════════════════════════════════════════════════
 let _pollHandle = null;
 function iniciarPolling(){
   if(_pollHandle) clearInterval(_pollHandle);
@@ -3556,6 +3582,9 @@ if(IS_IOS){
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LISTENERS
+// ═══════════════════════════════════════════════════════════════════════════
 $('menuToggle').addEventListener('click', () => {
   const app = $('app');
   if(isMobile()){ app.classList.toggle('sidebar-open'); }
@@ -3735,6 +3764,9 @@ document.addEventListener('keydown', e => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// START APP
+// ═══════════════════════════════════════════════════════════════════════════
 function startApp(){
   hideLogin(); $('app').classList.add('is-ready');
   currentUser = sessionStorage.getItem('deman_user_nome') || '';
@@ -3864,11 +3896,19 @@ async function salvarCriarManut(){
   }
 
   btn.disabled = true; btn.textContent = 'Salvando…';
-  const r = await apiManut('criarProcesso', payload);
-  btn.disabled = false; btn.textContent = 'Criar processo';
-
-  if(!r.ok){
-    err.textContent = r.error || 'Erro ao salvar.';
+  let r;
+  try {
+    r = await apiManut('criarProcesso', payload);
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Criar processo';
+  }
+  if(!r || !r.ok){
+    err.textContent = (r && r.error) || 'Erro ao salvar.';
     err.style.display = 'block';
     return;
   }
@@ -3928,9 +3968,7 @@ function abrirFormEvento(p){
   $('me-data').value = agoraDatetimeLocal();
   $('me-status').value = '';
   montarCampoLocal('me-local-wrap', p.ultimo ? p.ultimo.local : '', $('me-status').value, true, tipoProc);
-  
   $('me-solicitante').value = p.solicitante || (p.entrada ? p.entrada.solicitante : '');
-  
   $('me-informante').value = '';
   $('me-detalhes').value = '';
   $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
@@ -4027,10 +4065,20 @@ async function salvarEventoManut(){
   if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
   btn.disabled = true; btn.textContent = 'Salvando…';
   const procId = processoAtual.id;
-  const r = await apiManut('adicionarEvento', { id: procId, tipo, data, status, local, solicitante, informante, detalhes });
-  btn.disabled = false; btn.textContent = 'Salvar evento';
-  if(!r.ok){ err.textContent = r.error || 'Erro ao salvar.'; err.style.display = 'block'; return; }
+  let r;
+  try {
+    r = await apiManut('adicionarEvento', { id: procId, tipo, data, status, local, solicitante, informante, detalhes });
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar evento';
+  }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
   _ultimoEventoAdicionado[procId] = Date.now();
+  _persistirDesfazer();
   try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
   await loadDataManut();
   limparFormManut();
@@ -4051,9 +4099,18 @@ async function salvarFinalizarManut(){
   if(!detalhes){ if(!confirm('Sem descrição do que foi feito. Continuar mesmo assim?')) return; }
   btn.disabled = true; btn.textContent = 'Salvando…';
   const procId = processoAtual.id;
-  const r = await apiManut('finalizarProcesso', { id: procId, statusFinal, dataFim, local, informante, detalhes });
-  btn.disabled = false; btn.textContent = 'Finalizar';
-  if(!r.ok){ err.textContent = r.error || 'Erro ao finalizar.'; err.style.display = 'block'; return; }
+  let r;
+  try {
+    r = await apiManut('finalizarProcesso', { id: procId, statusFinal, dataFim, local, informante, detalhes });
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Finalizar';
+  }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao finalizar.'; err.style.display = 'block'; return; }
   try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
   await loadDataManut();
   const grupos = agruparPorProcesso();
@@ -4111,6 +4168,7 @@ function cancelarFormManut(){
   window.scrollTo(0, 0);
 }
 
+let _sucessoMensagemWhats = '';
 function mostrarSucesso({ titulo, sub, resumo, mensagemWhats }){
   $('sucessoTitulo').textContent = titulo; $('sucessoSub').textContent = sub;
   $('sucessoResumo').innerHTML = resumo.map(([k, v]) => `<div class="resumo-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
