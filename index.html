@@ -260,7 +260,6 @@ input[type=datetime-local]:focus, input[type=date]:focus, input[type=time]:focus
 .veh-card{background:var(--surface);border:2px solid transparent;border-radius:11px;padding:12px 13px;overflow:hidden;-webkit-touch-callout:none;}
 .veh-name{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
 
-/* ─── SVG ROW compacto ─── */
 .svc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 30px 10px 10px;border-top:1px solid var(--border);border-left:4px solid transparent;position:relative;min-height:56px;}
 .svc-row:first-of-type{border-top:none;}
 .svc-left{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1;}
@@ -342,7 +341,6 @@ select.stage-select:hover{border-color:var(--amber);}
 .veh-row-actions .btn{font-size:12px;padding:7px 12px;border-radius:6px;flex:1;min-width:0;text-align:center;}
 .local-empty{font-size:12px;color:var(--text-faint);padding:20px;text-align:center;font-style:italic;}
 .empty{text-align:center;color:var(--text-faint);padding:40px 20px;font-size:14px;grid-column:1/-1;}
-/* ★ NOVO v6.5 — badges de multi-processo no painel de Viaturas */
 .multi-badge{display:inline-flex;align-items:center;gap:4px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:rgba(232,169,58,.15);border:1px solid rgba(232,169,58,.6);color:var(--amber);white-space:nowrap;}
 .multi-outros{font-size:10px;color:var(--text-dim);font-family:'IBM Plex Mono',monospace;margin-top:2px;}
 .multi-btn{font-size:11px;padding:5px 10px;background:transparent;border:1px solid var(--azul);color:var(--azul);border-radius:6px;cursor:pointer;font-family:'IBM Plex Mono',monospace;width:100%;margin-top:6px;touch-action:manipulation;}
@@ -357,7 +355,6 @@ select.stage-select:hover{border-color:var(--amber);}
 .manut-proc-card.fechado .manut-proc-head{background:linear-gradient(135deg, rgba(61,220,132,.08), var(--surface-2));}
 .manut-proc-card.baixada{border-color:rgba(239,83,80,.45);}
 .manut-proc-card.baixada .manut-proc-head{background:linear-gradient(135deg, rgba(239,83,80,.12), var(--surface-2));}
-/* ★ NOVO v6.5 — Agendamento */
 .manut-proc-card.agendado{border-color:rgba(177,140,255,.55);}
 .manut-proc-card.agendado .manut-proc-head{background:linear-gradient(135deg, rgba(177,140,255,.14), var(--surface-2));}
 .manut-proc-card.agendado-vencido{border-color:rgba(232,169,58,.65);}
@@ -461,7 +458,6 @@ select.stage-select:hover{border-color:var(--amber);}
 .user-actions{display:flex;gap:6px;flex-wrap:wrap;padding-top:4px;border-top:1px solid var(--border);}
 .user-actions .btn{font-size:12px;padding:7px 12px;flex:1;min-width:0;text-align:center;}
 
-/* ─── REPORT ─── */
 .report-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px 24px;width:100%;max-width:1200px;display:flex;flex-direction:column;gap:16px;box-shadow:0 20px 60px rgba(0,0,0,.6);max-height:90dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .report-header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:12px;border-bottom:1px solid var(--border);}
 .report-header h2{font-family:'Rajdhani',sans-serif;font-size:22px;margin:0;color:var(--amber);letter-spacing:.02em;}
@@ -522,7 +518,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 .local-field-wrap input:disabled{opacity:.55;cursor:not-allowed;background:var(--surface);}
 .local-hint{font-size:10px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;letter-spacing:.03em;}
 
-/* ─── Dropdown customizado de viaturas ─── */
 .pf-dropdown-wrap{position:relative;width:100%;}
 .pf-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;z-index:60;display:none;box-shadow:0 12px 32px rgba(0,0,0,.55);}
 .pf-dropdown.open{display:block;}
@@ -533,7 +528,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 .pf-dropdown-item .pf-di-placa{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);white-space:nowrap;}
 .pf-dropdown-empty{padding:14px;text-align:center;color:var(--text-faint);font-size:12px;font-style:italic;}
 
-/* ─── MANUTENÇÃO PREVENTIVA ─── */
 .prev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;}
 @media (max-width:600px){.prev-grid{grid-template-columns:1fr;}}
 .prev-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;-webkit-touch-callout:none;}
@@ -594,15 +588,8 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   PRINT — só imprime o modal de relatório que está aberto (.is-open)
-   ═══════════════════════════════════════════════════════════════════════════ */
 @media print{
-  html, body {
-    margin: 0 !important; padding: 0 !important;
-    background: #fff !important; color: #000 !important;
-    min-height: 0 !important; height: auto !important;
-  }
+  html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; color: #000 !important; min-height: 0 !important; height: auto !important; }
   .topbar, .sidebar, .sidebar-backdrop { display: none !important; }
   .main { margin-left: 0 !important; padding: 0 !important; min-height: 0 !important; height: auto !important; }
   .view { padding: 0 !important; }
@@ -611,35 +598,13 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
   #procExistenteModal, #multiProcessosModal, #forcarConversaoModal { display: none !important; }
   body.relatorio-aberto #app { display: none !important; }
   #reportModal, #manutReportModal, #prevReportModal { display: none !important; }
-  #reportModal.is-open, #manutReportModal.is-open, #prevReportModal.is-open {
-    display: block !important;
-    position: static !important;
-    inset: auto !important;
-    background: #fff !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    max-height: none !important;
-    overflow: visible !important;
-  }
-  .report-box {
-    background: #fff !important; color: #000 !important;
-    box-shadow: none !important; border: none !important;
-    max-width: none !important; max-height: none !important;
-    padding: 0 !important; overflow: visible !important;
-    width: 100% !important; margin: 0 !important;
-  }
+  #reportModal.is-open, #manutReportModal.is-open, #prevReportModal.is-open { display: block !important; position: static !important; inset: auto !important; background: #fff !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; max-height: none !important; overflow: visible !important; }
+  .report-box { background: #fff !important; color: #000 !important; box-shadow: none !important; border: none !important; max-width: none !important; max-height: none !important; padding: 0 !important; overflow: visible !important; width: 100% !important; margin: 0 !important; }
   .report-header h2 { color: #000 !important; }
   .report-header .meta { color: #333 !important; }
   .report-kpi { background: #f2f2f2 !important; border: 1px solid #999 !important; }
   .report-kpi .kpi-label { color: #555 !important; }
-  .report-kpi .kpi-value,
-  .report-kpi.kpi-total .kpi-value,
-  .report-kpi.kpi-pend .kpi-value,
-  .report-kpi.kpi-aprov .kpi-value,
-  .report-kpi.kpi-final .kpi-value,
-  .report-kpi.kpi-qnt .kpi-value,
-  .report-kpi.kpi-dist .kpi-value { color: #000 !important; }
+  .report-kpi .kpi-value, .report-kpi.kpi-total .kpi-value, .report-kpi.kpi-pend .kpi-value, .report-kpi.kpi-aprov .kpi-value, .report-kpi.kpi-final .kpi-value, .report-kpi.kpi-qnt .kpi-value, .report-kpi.kpi-dist .kpi-value { color: #000 !important; }
   .report-filters { background: #f2f2f2 !important; color: #333 !important; }
   .report-filters b { color: #000 !important; }
   .report-filters select, .report-filters input[type=text] { background: #fff !important; border: 1px solid #999 !important; color: #000 !important; }
@@ -1255,7 +1220,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
   </div>
 </div>
 
-<!-- ★ NOVO v6.5 — Modal "Ver todos os processos" (multi-local) -->
 <div id="multiProcessosModal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:560px;">
     <h2>🔧 Processos abertos</h2>
@@ -1267,7 +1231,6 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
   </div>
 </div>
 
-<!-- ★ NOVO v6.5 — Modal "Forçar conversão" (agendamento com viatura ocupada) -->
 <div id="forcarConversaoModal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:580px;">
     <h2>⚠️ Viatura ocupada</h2>
@@ -1341,7 +1304,7 @@ const PERM_GRUPOS = {
 };
 
 const LOCAIS_OFICINA = [
-  'FIX CAR','VIDROCAR','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
+  'FIX CAR','VIDROCAR','AUTO MIX','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
   'MULTIRADIUS','RENOBAN','XINGO','PAULISTA','LEANDRO TRUCK','CAXANGA',
   'M. SOBRAL','ARIBE MOTOS','AC MOTOS',
   'SR. AROLDO','MARDISA','MORAUTO','SANVEL',
@@ -1705,7 +1668,6 @@ function renderHome(){
   $('h-m-total').textContent = mStats.total;
   $('h-m-abertos').textContent = mStats.abertos;
   $('h-m-fechados').textContent = mStats.fechados;
-  // ★ NOVO v6.5 — KPIs agendamento/alerta
   const grupos = agruparPorProcesso();
   let agendAbertos = 0;
   let alertaCount = 0;
@@ -2131,7 +2093,6 @@ function renderSummaryViaturas(){
   const clearBtn = $('viatClearFilterBtn'); if(clearBtn) clearBtn.style.display = (activeFilter === 'todas') ? 'none' : 'inline-block';
 }
 
-// ★ NOVO v6.5 — Mapa de processos Viatura abertos por prefixo (para multiplicação)
 function mapaProcViaturaAbertos(){
   const grupos = agruparPorProcesso();
   const mapa = {};
@@ -2143,7 +2104,6 @@ function mapaProcViaturaAbertos(){
     const local = (g.ultimo && g.ultimo.local) || (g.entrada && g.entrada.local) || '';
     if(local) mapa[pfx].locais.add(local.toUpperCase());
   });
-  // Converter Set→array e calcular multiLocal
   Object.values(mapa).forEach(m => {
     m.locaisArray = Array.from(m.locais);
     m.multiLocal = m.locaisArray.length >= 2;
@@ -2177,7 +2137,6 @@ function htmlVehRow(v, localCard, mapaProc){
   if(v.origem === 'reserva'){
     return `<div class="veh-row"><div class="veh-row-top"><span class="veh-row-prefix">${escapeHtml(v.prefixo)}</span>${multiBadge}</div>${multiOutros}${podeGerenciar ? `<div class="veh-row-actions"><button class="btn ghost" data-action="permutar" data-prefixo="${escapeAttr(v.prefixo)}" data-origem="reserva" data-gbm="">→ Ativa</button><button class="btn ghost danger" data-action="baixar" data-prefixo="${escapeAttr(v.prefixo)}" data-gbm="" data-origem="reserva">Baixar</button></div>` : ''}${multiBtn}</div>`;
   }
-  // ativa
   return `<div class="veh-row"><div class="veh-row-top"><span class="veh-row-prefix">${escapeHtml(v.prefixo)}</span>${multiBadge}</div>${multiOutros}${podeGerenciar ? `<div class="veh-row-actions"><button class="btn ghost" data-action="mudar" data-prefixo="${escapeAttr(v.prefixo)}">Mudar local</button><button class="btn ghost" data-action="permutar" data-prefixo="${escapeAttr(v.prefixo)}" data-origem="ativa" data-gbm="${escapeAttr(v.gbm||'')}">→ Reserva</button><button class="btn ghost danger" data-action="baixar" data-prefixo="${escapeAttr(v.prefixo)}" data-gbm="${escapeAttr(v.gbm||'')}" data-origem="ativa">Baixar</button></div>` : ''}${multiBtn}</div>`;
 }
 
@@ -2231,7 +2190,6 @@ function bindActionsViaturas(){
     document.querySelectorAll('#view-viaturas [data-action="reativar"]').forEach(b => b.addEventListener('click', () => abrirModalReativar(b.dataset.prefixo)));
     document.querySelectorAll('#view-viaturas [data-action="moverReserva"]').forEach(b => b.addEventListener('click', () => abrirModalMoverReserva(b.dataset.prefixo)));
   }
-  // ★ NOVO v6.5 — botão "ver todos processos" (sempre disponível)
   document.querySelectorAll('#view-viaturas [data-action="verProcessos"]').forEach(b => b.addEventListener('click', () => abrirModalMultiProcessos(b.dataset.prefixo)));
 }
 
@@ -2320,7 +2278,6 @@ function abrirModalMoverReserva(prefixo){
   }, 'viat_permutar');
 }
 
-// ★ NOVO v6.5 — Modal "Ver todos processos"
 function abrirModalMultiProcessos(prefixo){
   const grupos = agruparPorProcesso();
   const procs = Object.values(grupos)
@@ -2420,6 +2377,7 @@ function lerLocalForm(wrapId){
 
 let MANUT_EVENTOS = [];
 let MANUT_FILTRO_STATUS = 'todas';
+let MANUT_FILTRO_TIPO = ''; // ← Correção aplicada
 let activeManutTab = 'registros';
 let modoManutForm = 'criar';
 let processoAtual = null;
@@ -2513,7 +2471,6 @@ async function loadDataManut(){
     upd.textContent = 'Atualizado em ' + new Date().toLocaleTimeString('pt-BR');
     if(activeView === 'manutencao') renderManut();
     if(activeView === 'home') renderHome();
-    // Viaturas dependem de MANUT_EVENTOS para modo C — força re-render
     if(activeView === 'viaturas') renderViaturas();
   }catch(err){
     console.error(err);
@@ -2545,7 +2502,6 @@ function agruparPorProcesso(){
     g.dias = g.finalizacao ? extrairDiasNumericos(g.finalizacao.dias) : 0;
     if(g.entrada && g.entrada.tipo) g.tipo = g.entrada.tipo;
     g.solicitante = (g.entrada && g.entrada.solicitante) ? g.entrada.solicitante : '';
-    // ★ NOVO v6.5 — status de agendamento
     if(g.tipo === TIPO_AGENDAMENTO){
       g.agendamentoConvertido = g.eventos.some(e =>
         e.evento === EVENTO_FINALIZACAO && normalizeStr(e.status).indexOf('convert') !== -1
@@ -2652,7 +2608,6 @@ function renderManutGrid(){
     const tipoClasse = tipoProc === TIPO_OUTRO ? 'outro' : (tipoProc === TIPO_AGENDAMENTO ? 'agendamento' : 'viatura');
     const badgeTipo = `<span class="manut-proc-tipo ${tipoClasse}">${escapeHtml(tipoProc)}</span>`;
 
-    // Classe visual do card
     let classeCard, statusLabel, statusClasse;
     if(tipoProc === TIPO_AGENDAMENTO){
       if(p.agendamentoConvertido){ classeCard = 'agendado-convertido'; statusLabel = 'Convertido'; statusClasse = 'convertido'; }
@@ -2684,10 +2639,8 @@ function renderManutGrid(){
       </div>`;
     }).join('');
 
-    // Ações
     let acoes = '';
     if(tipoProc === TIPO_AGENDAMENTO){
-      // Só permite Observação + exclusão. Conversão manual se vencido e não convertido.
       if(p.aberto && !p.agendamentoConvertido){
         if(podeEditar) acoes += `<button class="btn ghost" data-action="evento" data-id="${escapeAttr(p.id)}">+ Observação</button>`;
         if(p.agendamentoVencido && podeEditar){
@@ -2713,7 +2666,6 @@ function renderManutGrid(){
       }
     }
 
-    // Badge principal
     let badge;
     if(tipoProc === TIPO_AGENDAMENTO){
       if(p.agendamentoConvertido) badge = '<span class="manut-proc-badge agendado-convertido">✅ Convertido</span>';
@@ -2723,7 +2675,6 @@ function renderManutGrid(){
       badge = p.aberto ? '<span class="manut-proc-badge aberto">🟡 Aberto</span>' : '<span class="manut-proc-badge fechado">✅ Fechado</span>';
     }
 
-    // Data badge
     let dataBadge = '';
     if(tipoProc === TIPO_AGENDAMENTO && p.entrada){
       const dt = parseDataManut(p.entrada.data);
@@ -2737,7 +2688,6 @@ function renderManutGrid(){
     const diasTxt = p.finalizacao && p.dias > 0 ? `${p.dias}d` : '';
     const solicitanteHtml = p.solicitante ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--azul);">👤 Solicitado por ${escapeHtml(p.solicitante)}</span>` : '';
 
-    // Badge SLA para processos abertos há mais de 15/30 dias
     let slaBadge = '';
     if(tipoProc !== TIPO_AGENDAMENTO && p.aberto && p.entrada){
       const dtEntrada = parseDataManut(p.entrada.data);
@@ -2775,7 +2725,6 @@ function renderManutGrid(){
     </div>`;
   }).join('');
 
-  // Handlers
   if(_desfazerTimer) clearTimeout(_desfazerTimer);
   const agora = Date.now();
   let menorRestante = Infinity;
@@ -2846,12 +2795,10 @@ function renderManut(){
   if(clearBtn) clearBtn.style.display = (MANUT_FILTRO_STATUS !== 'todas' || MANUT_FILTRO_TIPO) ? 'inline-block' : 'none';
 }
 
-// ★ NOVO v6.5 — Conversão manual/forçada
 let _conversaoPendenteId = null;
 function tentarConverterAgendamento(p){
   if(!p || p.tipo !== TIPO_AGENDAMENTO || p.agendamentoConvertido) return;
   _conversaoPendenteId = p.id;
-  // Verifica no servidor se há outros Viatura abertos
   (async () => {
     const r = await apiManut('forcarConversaoAgendamento', { idAgendamento: p.id, paralelo: false });
     if(r.ok){
@@ -2888,6 +2835,41 @@ function abrirModalForcarConversao(p, processosAbertos){
   $('forcarConversaoModal').style.display = 'flex';
 }
 
+function getMesesDisponiveisManut(){
+  const set = new Set();
+  MANUT_EVENTOS.forEach(e => {
+    const d = parseDataManut(e.data);
+    if(!d) return;
+    set.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  });
+  return Array.from(set).sort().reverse();
+}
+function abrirRelatorioManut(){
+  const select = $('manutReportMonth'); const meses = getMesesDisponiveisManut();
+  select.innerHTML = '<option value="">Todos os meses</option>' + meses.map(ym => `<option value="${escapeAttr(ym)}">${escapeHtml(formatarMesAno(ym))}</option>`).join('');
+  select.value = '';
+  $('manutReportMode').value = 'detalhado';
+  const selStatus = $('manutReportStatus'); if(selStatus) selStatus.value = '';
+  manutRepStatusFiltro = '';
+  const agora = new Date();
+  $('manutReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
+  renderRelatorioManut();
+  _abrirReportModal('manutReportModal');
+}
+function atualizarVisibilidadeModoManut(){
+  const modo = $('manutReportMode').value;
+  const isMes = modo === 'mes';
+  $('manutReportDetalhado').style.display = isMes ? 'none' : '';
+  $('manutReportPorMes').style.display = isMes ? '' : 'none';
+  const periodoWrap = $('manutReportPeriodWrap');
+  if(periodoWrap) periodoWrap.style.display = isMes ? 'none' : 'flex';
+}
+function renderRelatorioManut(){
+  atualizarVisibilidadeModoManut();
+  const modo = $('manutReportMode').value;
+  if(modo === 'mes') renderRelatorioManutPorMes();
+  else renderRelatorioManutDetalhado();
+}
 function renderRelatorioManutDetalhado(){
   const mes = $('manutReportMonth').value;
   const grupos = agruparPorProcesso();
@@ -2938,42 +2920,6 @@ function renderRelatorioManutDetalhado(){
         </tr>`;
       }).join('');
 }
-
-function getMesesDisponiveisManut(){
-  const set = new Set();
-  MANUT_EVENTOS.forEach(e => {
-    const d = parseDataManut(e.data);
-    if(!d) return;
-    set.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
-  });
-  return Array.from(set).sort().reverse();
-}
-function abrirRelatorioManut(){
-  const select = $('manutReportMonth'); const meses = getMesesDisponiveisManut();
-  select.innerHTML = '<option value="">Todos os meses</option>' + meses.map(ym => `<option value="${escapeAttr(ym)}">${escapeHtml(formatarMesAno(ym))}</option>`).join('');
-  select.value = '';
-  $('manutReportMode').value = 'detalhado';
-  const selStatus = $('manutReportStatus'); if(selStatus) selStatus.value = '';
-  manutRepStatusFiltro = '';
-  const agora = new Date();
-  $('manutReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
-  renderRelatorioManut();
-  _abrirReportModal('manutReportModal');
-}
-function atualizarVisibilidadeModoManut(){
-  const modo = $('manutReportMode').value;
-  const isMes = modo === 'mes';
-  $('manutReportDetalhado').style.display = isMes ? 'none' : '';
-  $('manutReportPorMes').style.display = isMes ? '' : 'none';
-  const periodoWrap = $('manutReportPeriodWrap');
-  if(periodoWrap) periodoWrap.style.display = isMes ? 'none' : 'flex';
-}
-function renderRelatorioManut(){
-  atualizarVisibilidadeModoManut();
-  const modo = $('manutReportMode').value;
-  if(modo === 'mes') renderRelatorioManutPorMes();
-  else renderRelatorioManutDetalhado();
-}
 function renderRelatorioManutPorMes(){
   const grupos = {};
   MANUT_EVENTOS.forEach(e => {
@@ -3014,9 +2960,6 @@ function renderRelatorioManutPorMes(){
   }).join('');
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// PREVENTIVA (mesma lógica anterior)
-// ═══════════════════════════════════════════════════════════════════════════
 const STORAGE_KEY_PREV = 'deman_cache_preventiva_v1';
 const PREV_CACHE_TTL   = 15 * 60 * 1000;
 let PREV_VIATURAS = [];
@@ -3342,7 +3285,6 @@ function _handlePfBuscaInput(){
   renderDropdownViaturas();
 }
 
-// RELATÓRIO PREVENTIVA
 let prevRepFiltroOleo = '';
 let prevRepFiltroPrevisao = '';
 let prevRepFiltroKm = '';
@@ -3523,7 +3465,6 @@ function abrirRelatorioPreventiva(){
   _abrirReportModal('prevReportModal');
 }
 
-// USUÁRIOS
 let USUARIOS_CACHE = [];
 async function carregarUsuarios(){
   if(!podeVerUsuarios()) return;
@@ -3711,11 +3652,9 @@ $('prevReportPrint').addEventListener('click', () => window.print());
 $('prevReportClose').addEventListener('click', () => _fecharReportModal('prevReportModal'));
 $('prevReportModal').addEventListener('click', e => { if(e.target.id === 'prevReportModal') _fecharReportModal('prevReportModal'); });
 
-// ★ NOVO v6.5 — Listeners do modal multi-processos
 $('multiProcessosClose').addEventListener('click', () => $('multiProcessosModal').style.display = 'none');
 $('multiProcessosModal').addEventListener('click', e => { if(e.target.id === 'multiProcessosModal') $('multiProcessosModal').style.display = 'none'; });
 
-// ★ NOVO v6.5 — Listeners do modal forçar conversão
 $('forcarConversaoCancelar').addEventListener('click', () => { $('forcarConversaoModal').style.display = 'none'; _conversaoPendenteId = null; });
 $('forcarConversaoModal').addEventListener('click', e => { if(e.target.id === 'forcarConversaoModal'){ $('forcarConversaoModal').style.display = 'none'; _conversaoPendenteId = null; } });
 $('forcarConversaoCriarParalelo').addEventListener('click', async () => {
@@ -3807,9 +3746,6 @@ function startApp(){
   iniciarPolling();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// ★ NOVO v6.5 — Fluxo do formulário de Agendamento
-// ═══════════════════════════════════════════════════════════════════════════
 function setFormModo(modo){
   modoManutForm = modo;
   $('formCriar').style.display = (modo === 'criar') ? '' : 'none';
@@ -3862,7 +3798,6 @@ function atualizarFormPorTipo(){
     if(lblDataAg) lblDataAg.style.display = '';
     if(lblHoraAg) lblHoraAg.style.display = '';
     wrapLocal.innerHTML = _htmlInputLocal('mm-local', lerLocalForm('mm-local-wrap'));
-    // Default data = hoje + 7 dias
     const dt = new Date(); dt.setDate(dt.getDate() + 7);
     const pad = n => String(n).padStart(2,'0');
     $('mm-data-ag').value = dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate());
@@ -3964,7 +3899,6 @@ async function salvarCriarManut(){
   limparFormManut();
 }
 
-// Modificar abrirFormEvento para tratar agendamento
 function abrirFormEvento(p){
   if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
   processoAtual = p;
@@ -4252,13 +4186,6 @@ function montarMensagemFinalizacao(p){
   return linhas.join('\n');
 }
 
-// OVERRIDE: getMesesDisponiveisManut (já definida na v6.4, mantida)
-// OVERRIDE: renderRelatorioManutDetalhado (já definida)
-// OVERRIDE: renderRelatorioManutPorMes (já definida)
-
-// ═══════════════════════════════════════════════════════════════════════════
-// BOOT
-// ═══════════════════════════════════════════════════════════════════════════
 if(isLoggedIn()){
   currentLogin = sessionStorage.getItem('deman_user_login') || '';
   currentUser = sessionStorage.getItem('deman_user_nome') || '';
