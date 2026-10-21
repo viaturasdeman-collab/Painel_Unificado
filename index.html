@@ -1317,7 +1317,7 @@ const LOCAIS_UNIDADE = [
 ];
 const LOCAIS_DIRETORIA = [
   'DOP','DEP','DAT','DLOG','DGP','DPLAN','ASSIN','ASTEI','ASTEA','ASCOM','ASTINF',
-  'ALMOXARIFADO','SAT','GABINETE DO COMANDO','CIOSP','COBOM','CORREGEDORIA','CANIL'
+  'CSMP','SAT','GABINETE DO COMANDO','CIOSP','COBOM','CORREGEDORIA','CANIL'
 ];
 const LOCAL_RESERVA = 'DEMAN';
 const LOCAIS_BAIXADA = [LOCAL_RESERVA].concat(LOCAIS_OFICINA);
@@ -2143,8 +2143,11 @@ function htmlVehRow(v, localCard, mapaProc){
 
 function htmlLocalCard(nome, viaturas, tipo, mapaProc){
   const qtd = viaturas.length; const label = qtd === 1 ? '1 viatura' : qtd+' viaturas';
+  // ══════════ ALTERAÇÃO CSMP ══════════
+  const labelNome = (nome === 'CSMP') ? 'CSMP (Almoxarifado)' : nome;
+  // ═══════════════════════════════════
   const bodyHtml = qtd === 0 ? `<div class="local-empty">Nenhuma viatura neste local</div>` : viaturas.sort((a,b)=>a.prefixo.localeCompare(b.prefixo)).map(v => htmlVehRow(v, nome, mapaProc)).join('');
-  return `<div class="local-card ${tipo||''}"><div class="local-head"><div class="local-name">${escapeHtml(nome)}</div><div class="local-count">${label}</div></div><div class="local-body">${bodyHtml}</div></div>`;
+  return `<div class="local-card ${tipo||''}"><div class="local-head"><div class="local-name">${escapeHtml(labelNome)}</div><div class="local-count">${label}</div></div><div class="local-body">${bodyHtml}</div></div>`;
 }
 
 function renderLocalGridViaturas(){
@@ -2209,7 +2212,13 @@ function abrirModal(titulo, camposHtml, onConfirm, permissaoNecessaria){
   confirm.addEventListener('click', handler); cancel.addEventListener('click', fechar);
 }
 function htmlOpcoesLocais(selecionado){
-  function opt(l){ const sel = (selecionado && normalizeStr(l) === normalizeStr(selecionado)) ? ' selected' : ''; return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(l)}</option>`; }
+  // ══════════ ALTERAÇÃO CSMP ══════════
+  function opt(l){
+    const sel = (selecionado && normalizeStr(l) === normalizeStr(selecionado)) ? ' selected' : '';
+    const label = (l === 'CSMP') ? 'Almoxarifado' : l;
+    return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(label)}</option>`;
+  }
+  // ═══════════════════════════════════
   let html = '';
   if(LOCAIS.length > 0) html += `<optgroup label="GBMs / SGBM / GBS">${LOCAIS.map(opt).join('')}</optgroup>`;
   if(LOCAIS_DIRETORIAS.length > 0) html += `<optgroup label="Diretorias">${LOCAIS_DIRETORIAS.map(opt).join('')}</optgroup>`;
@@ -2325,10 +2334,13 @@ function _htmlInputLocal(idCampo, valorAtual){
 }
 function _htmlSelectLocal(idCampo, valorAtual){
   const vAtual = String(valorAtual||'').trim().toUpperCase();
+  // ══════════ ALTERAÇÃO CSMP ══════════
   function opt(l){
     const sel = (vAtual && vAtual === l.toUpperCase()) ? ' selected' : '';
-    return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(l)}</option>`;
+    const label = (l === 'CSMP') ? 'Almoxarifado' : l;
+    return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(label)}</option>`;
   }
+  // ═══════════════════════════════════
   const selVazio = vAtual ? '' : ' selected';
   return `<select id="${idCampo}" autocomplete="off">
     <option value=""${selVazio}>— Selecione o local —</option>
@@ -3987,7 +3999,7 @@ function showManutTab(name){
   if(name !== 'registros' && name !== 'novo') return;
   if(name === 'novo' && !temPermissao('manut_criar')) name = 'registros';
   activeManutTab = name;
-  document.querySelectorAll('#sidebarSubMov .sidebar-sublink').forEach(b => { b.classList.toggle('active', b.dataset.manutTab === name); });
+  document.querySelectorAll('#sidebarSubMov .sidebar-sublink').forEach(b => b.classList.toggle('active', b.dataset.manutTab === name));
   $('manutPanel-registros').classList.toggle('active', name === 'registros');
   $('manutPanel-novo').classList.toggle('active', name === 'novo');
   setSidebarMovExpanded(true);
