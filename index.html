@@ -2376,8 +2376,8 @@ function lerLocalForm(wrapId){
 }
 
 let MANUT_EVENTOS = [];
-let MANUT_FILTRO_STATUS = 'todas';
-let MANUT_FILTRO_TIPO = ''; // ← Correção aplicada
+let MANUT_FILTRO_STATUS = 'abertos'; // ← Mude de 'todas' para 'abertos'
+let MANUT_FILTRO_TIPO = ''; 
 let activeManutTab = 'registros';
 let modoManutForm = 'criar';
 let processoAtual = null;
@@ -3688,7 +3688,7 @@ document.addEventListener('click', e => {
 });
 
 $('manutSearch').addEventListener('input', debounce(renderManut, 180));
-$('manutClearFilterBtn').addEventListener('click', () => { MANUT_FILTRO_STATUS = 'todas'; MANUT_FILTRO_TIPO = ''; $('manutFiltroTipo').value = ''; renderManut(); });
+$('manutClearFilterBtn').addEventListener('click', () => { MANUT_FILTRO_STATUS = 'abertos'; MANUT_FILTRO_TIPO = ''; $('manutFiltroTipo').value = ''; renderManut(); });
 $('manutFiltroTipo').addEventListener('change', e => { MANUT_FILTRO_TIPO = e.target.value; renderManut(); });
 $('mm-tipo').addEventListener('change', atualizarFormPorTipo);
 $('mm-save').addEventListener('click', salvarManut);
