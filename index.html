@@ -2668,6 +2668,26 @@ function renderManutGrid(){
           acoes += `<button class="btn success" data-action="converterAgendamento" data-id="${escapeAttr(p.id)}">⚡ Converter agora</button>`;
         }
       }
+      acoes += `<button class="btn whatsapp" data-action="whats" data-id="${escapeAttr(p.id)}" title="Compartilhar">${waSvgCard}</button>`;
+      
+      const podeApagar = podeExcluirAberto;
+      if(podeApagar) acoes += `<button class="btn danger" data-action="excluir" data-id="${escapeAttr(p.id)}" title="Excluir agendamento">🗑</button>`;
+    } else {
+      if(p.aberto){
+        if(podeEditar) acoes += `<button class="btn success" data-action="finalizar" data-id="${escapeAttr(p.id)}">✅ Finalizar</button>`;
+        if(podeEditar) acoes += `<button class="btn ghost" data-action="evento" data-id="${escapeAttr(p.id)}">+ Evento</button>`;
+      }
+      acoes += `<button class="btn whatsapp" data-action="whats" data-id="${escapeAttr(p.id)}" title="Compartilhar">${waSvgCard}</button>`;
+      const tsUltimo = _ultimoEventoAdicionado[p.id] || 0;
+      const dentroJanela = (Date.now() - tsUltimo) < DESFAZER_JANELA_MS;
+      if(p.aberto && p.eventos.length > 1 && podeEditar && dentroJanela){
+        acoes += `<button class="btn ghost" data-action="desfazer" data-id="${escapeAttr(p.id)}" title="Desfazer último evento">↩</button>`;
+      }
+      const podeApagarEste = p.aberto ? podeExcluirAberto : podeExcluirFechado;
+      if(podeApagarEste){
+        acoes += `<button class="btn danger" data-action="excluir" data-id="${escapeAttr(p.id)}" title="Excluir processo">🗑</button>`;
+      }
+    }
       const podeApagar = podeExcluirAberto;
       if(podeApagar) acoes += `<button class="btn danger" data-action="excluir" data-id="${escapeAttr(p.id)}" title="Excluir agendamento">🗑</button>`;
     } else {
