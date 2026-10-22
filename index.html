@@ -2417,9 +2417,18 @@ let manutRepStatusFiltro = '';
 
 function setSidebarMovExpanded(v){ sidebarMovExpanded = !!v; const sub = $('sidebarSubMov'); const parent = $('sidebarMovParent'); if(sub) sub.classList.toggle('open', sidebarMovExpanded); if(parent) parent.classList.toggle('expanded', sidebarMovExpanded); }
 function parseDataManut(str){
-  if(!str) return null; const s = String(str).trim(); if(s === '--' || s === '') return null;
-  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/); if(m) return new Date(+m[3], +m[2]-1, +m[1]);
-  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  if(!str) return null; 
+  const s = String(str).trim(); 
+  if(s === '--' || s === '') return null;
+  
+  // Extrai Data e Hora (formato brasileiro: dd/mm/yyyy hh:mm)
+  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/); 
+  if(m) return new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0));
+  
+  // Extrai Data e Hora (formato ISO: yyyy-mm-ddThh:mm)
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT]+(\d{2}):(\d{2}))?/); 
+  if(m) return new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0));
+  
   return null;
 }
 function normalizarPrefixoManut(v){ const t = String(v||'').trim().toUpperCase(); const m = t.match(/^([A-Z]+)[\s-]*(\d+)$/); if(m){ const num = m[2].length === 1 ? '0'+m[2] : m[2]; return m[1]+'-'+num; } return t.replace(/\s+/g,' '); }
