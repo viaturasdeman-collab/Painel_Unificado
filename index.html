@@ -1322,7 +1322,20 @@ const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 if(IS_IOS) document.documentElement.classList.add('is-ios');
 const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 if(IS_TOUCH) document.documentElement.classList.add('is-touch');
-
+// Sincronização de Hora com a Internet (Google)
+let _serverTimeOffset = 0;
+async function syncInternetTime() {
+  try {
+    const r = await fetch('https://www.google.com', { method: 'HEAD', cache: 'no-store' });
+    const serverDate = new Date(r.headers.get('date'));
+    _serverTimeOffset = serverDate.getTime() - Date.now();
+  } catch(e) { 
+    console.warn('Falha ao sincronizar hora com a internet', e); 
+  }
+}
+function getNowTime() {
+  return Date.now() + _serverTimeOffset;
+}
 function bindPasswordToggles(){
   document.querySelectorAll('.pass-toggle').forEach(btn => {
     if(btn.dataset.bound === '1') return;
@@ -2545,7 +2558,7 @@ function agruparPorProcesso(){
       );
       if(!g.agendamentoConvertido && g.entrada){
         const dtAg = parseDataManut(g.entrada.data);
-        g.agendamentoVencido = dtAg && dtAg.getTime() <= Date.now();
+        g.agendamentoVencido = dtAg && dtAg.getTime() <= getNowTime();
         g.dataAgendada = dtAg;
       }
     }
@@ -3779,7 +3792,7 @@ document.addEventListener('keydown', e => {
 // START APP
 // ═══════════════════════════════════════════════════════════════════════════
 function startApp(){
-  hideLogin(); $('app').classList.add('is-ready');
+  hideLogin(); $('app').classList.add('is-ready'); syncInternetTime();
   currentUser = sessionStorage.getItem('deman_user_nome') || '';
   currentPerfil = sessionStorage.getItem('deman_user_perfil') || 'view';
   currentLogin = sessionStorage.getItem('deman_user_login') || '';
