@@ -1322,17 +1322,36 @@ const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 if(IS_IOS) document.documentElement.classList.add('is-ios');
 const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 if(IS_TOUCH) document.documentElement.classList.add('is-touch');
-// Sincronização de Hora com a Internet (Google)
 let _serverTimeOffset = 0;
+
 async function syncInternetTime() {
-  try {
-    const r = await fetch('https://www.google.com', { method: 'HEAD', cache: 'no-store' });
-    const serverDate = new Date(r.headers.get('date'));
-    _serverTimeOffset = serverDate.getTime() - Date.now();
-  } catch(e) { 
-    console.warn('Falha ao sincronizar hora com a internet', e); 
+  const fontes = [
+    async () => {
+      const r = await fetch('https://timeapi.io/api/Time/current/zone?timeZone=America/Sao_Paulo', { cache: 'no-store' });
+      const d = await r.json();
+      return new Date(d.year, d.month - 1, d.day, d.hour, d.minute, d.seconds);
+    },
+    async () => {
+      const r = await fetch('https://worldtimeapi.org/api/timezone/America/Sao_Paulo', { cache: 'no-store' });
+      const d = await r.json();
+      return new Date(d.datetime);
+    }
+  ];
+  for (const fonte of fontes) {
+    try {
+      const serverDate = await fonte();
+      if (serverDate && !isNaN(serverDate.getTime())) {
+        _serverTimeOffset = serverDate.getTime() - Date.now();
+        console.log('[DEMAN] Hora sincronizada. Offset =', _serverTimeOffset, 'ms');
+        return;
+      }
+    } catch (e) {
+      console.warn('[DEMAN] Fonte de hora falhou:', e);
+    }
   }
+  console.warn('[DEMAN] Não foi possível sincronizar; usando relógio local.');
 }
+
 function getNowTime() {
   return Date.now() + _serverTimeOffset;
 }
