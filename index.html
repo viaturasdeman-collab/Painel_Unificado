@@ -4185,7 +4185,21 @@ function fecharSucesso(){
   window.scrollTo(0, 0);
 }
 
-function abrirWhatsApp(texto){ const base = WHATSAPP_DESTINO ? 'https://wa.me/' + WHATSAPP_DESTINO : 'https://wa.me/'; window.open(base + '?text=' + encodeURIComponent(texto), '_blank'); }
+function abrirWhatsApp(texto) {
+  const textoCodificado = encodeURIComponent(texto);
+  
+  // Verifica se é um dispositivo móvel (celular/tablet)
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  if (isMobile) {
+    // Deep link nativo do app (abre direto no aplicativo)
+    window.location.href = `whatsapp://send?text=${textoCodificado}`;
+  } else {
+    // No computador, abre o WhatsApp Web diretamente,
+    // pulando a página "api.whatsapp.com" de seleção[reference:2][reference:3]
+    window.open(`https://web.whatsapp.com/send?text=${textoCodificado}`, '_blank');
+  }
+}
 function normalizarEventoParaMensagem(e){
   return { tipo: e.evento || e.tipo || '', data: e.data || '', status: e.status || '', local: e.local || '', informante: e.informante || '', detalhes: e.detalhes || '', dias: e.dias || '' };
 }
