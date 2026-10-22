@@ -1301,8 +1301,6 @@ const LOCAIS_OFICINA = [
 const LOCAIS_UNIDADE = [
   '1° GBM/1° SGBM','2° SGBM','2° GBM','3° GBM','4° GBM','5° GBM','6° GBM','7° GBM','GBS'
 ];
-// CSMP substitui ALMOXARIFADO — exibido como "Almoxarifado" nos selects,
-// mas gravado como CSMP na planilha/backends
 const LOCAIS_DIRETORIA = [
   'DOP','DEP','DAT','DLOG','DGP','DPLAN','ASSIN','ASTEI','ASTEA','ASCOM','ASTINF',
   'CSMP','SAT','GABINETE DO COMANDO','CIOSP','COBOM','CORREGEDORIA','CANIL'
@@ -1322,6 +1320,11 @@ const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 if(IS_IOS) document.documentElement.classList.add('is-ios');
 const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 if(IS_TOUCH) document.documentElement.classList.add('is-touch');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Sincronização de Hora com a Internet (v6.7)
+// timeapi.io + fallback worldtimeapi.org — ambas CORS-friendly
+// ═══════════════════════════════════════════════════════════════════════════
 let _serverTimeOffset = 0;
 
 async function syncInternetTime() {
@@ -1355,6 +1358,7 @@ async function syncInternetTime() {
 function getNowTime() {
   return Date.now() + _serverTimeOffset;
 }
+
 function bindPasswordToggles(){
   document.querySelectorAll('.pass-toggle').forEach(btn => {
     if(btn.dataset.bound === '1') return;
@@ -1696,7 +1700,7 @@ function renderHome(){
     if(g.tipo === TIPO_AGENDAMENTO && g.aberto) agendAbertos++;
     if(g.aberto && g.entrada){
       const dt = parseDataManut(g.entrada.data);
-      if(dt && (Date.now() - dt.getTime()) / 86400000 > 30) alertaCount++;
+      if(dt && (getNowTime() - dt.getTime()) / 86400000 > 30) alertaCount++;
     }
   });
   $('h-m-agend').textContent = agendAbertos;
@@ -2166,7 +2170,6 @@ function htmlVehRow(v, localCard, mapaProc){
 
 function htmlLocalCard(nome, viaturas, tipo, mapaProc){
   const qtd = viaturas.length; const label = qtd === 1 ? '1 viatura' : qtd+' viaturas';
-  // CSMP é exibido como "CSMP (Almoxarifado)" no cabeçalho
   const labelNome = (nome === 'CSMP') ? 'CSMP (Almoxarifado)' : nome;
   const bodyHtml = qtd === 0 ? `<div class="local-empty">Nenhuma viatura neste local</div>` : viaturas.sort((a,b)=>a.prefixo.localeCompare(b.prefixo)).map(v => htmlVehRow(v, nome, mapaProc)).join('');
   return `<div class="local-card ${tipo||''}"><div class="local-head"><div class="local-name">${escapeHtml(labelNome)}</div><div class="local-count">${label}</div></div><div class="local-body">${bodyHtml}</div></div>`;
@@ -2193,7 +2196,6 @@ function renderLocalGridViaturas(){
     const listaDir = LOCAIS_DIRETORIAS.length ? LOCAIS_DIRETORIAS : LOCAIS_DIRETORIA;
     const porLocal = {}; listaDir.forEach(l => porLocal[l] = []);
     ativasDir.forEach(v => { const key = v.gbm || '(Sem local)'; if(!porLocal[key]) porLocal[key] = []; porLocal[key].push(v); });
-    // iteração dinâmica: inclui locais órfãos no final
     const ordem = [...listaDir, ...Object.keys(porLocal).filter(k => !listaDir.includes(k))];
     let html = ''; ordem.forEach(local => { const lista = porLocal[local] || []; if(q && lista.length === 0) return; html += htmlLocalCard(local, lista, '', mapaProc); });
     container.innerHTML = html; bindActionsViaturas(); return;
@@ -2249,8 +2251,6 @@ function abrirModal(titulo, camposHtml, onConfirm, permissaoNecessaria){
 function htmlOpcoesLocais(selecionado){
   function opt(l){
     const sel = (selecionado && normalizeStr(l) === normalizeStr(selecionado)) ? ' selected' : '';
-    // CSMP é exibido como "Almoxarifado" mas o value permanece CSMP.
-    // Fallback legado: aceita ALMOXARIFADO antigo sem quebrar a UI.
     const label = (l === 'CSMP' || l === 'ALMOXARIFADO') ? 'Almoxarifado' : l;
     return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(label)}</option>`;
   }
@@ -2341,7 +2341,7 @@ function abrirModalMultiProcessos(prefixo){
     lista.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-faint);">Nenhum processo aberto.</div>';
   } else {
     lista.innerHTML = procs.map(p => {
-      const dias = p.entrada ? Math.floor((Date.now() - (parseDataManut(p.entrada.data)?.getTime() || Date.now())) / 86400000) : 0;
+      const dias = p.entrada ? Math.floor((getNowTime() - (parseDataManut(p.entrada.data)?.getTime() || getNowTime())) / 86400000) : 0;
       const cor = dias > 30 ? 'var(--vermelho)' : (dias > 15 ? 'var(--amber)' : 'var(--text-dim)');
       return `<div style="background:var(--surface-2);border:1px solid var(--border);border-left:4px solid ${cor};border-radius:8px;padding:10px 12px;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px;">
@@ -2373,7 +2373,6 @@ function _htmlSelectLocal(idCampo, valorAtual){
   const vAtual = String(valorAtual||'').trim().toUpperCase();
   function opt(l){
     const sel = (vAtual && vAtual === l.toUpperCase()) ? ' selected' : '';
-    // CSMP é exibido como "Almoxarifado" mas o value permanece CSMP.
     const label = (l === 'CSMP' || l === 'ALMOXARIFADO') ? 'Almoxarifado' : l;
     return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(label)}</option>`;
   }
@@ -2448,19 +2447,18 @@ let _desfazerTimer = null;
 let manutRepStatusFiltro = '';
 
 function setSidebarMovExpanded(v){ sidebarMovExpanded = !!v; const sub = $('sidebarSubMov'); const parent = $('sidebarMovParent'); if(sub) sub.classList.toggle('open', sidebarMovExpanded); if(parent) parent.classList.toggle('expanded', sidebarMovExpanded); }
+
 function parseDataManut(str){
-  if(!str) return null; 
-  const s = String(str).trim(); 
+  if(!str) return null;
+  const s = String(str).trim();
   if(s === '--' || s === '') return null;
-  
-  // Extrai Data e Hora (formato brasileiro: dd/mm/yyyy hh:mm)
-  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/); 
+
+  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
   if(m) return new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0));
-  
-  // Extrai Data e Hora (formato ISO: yyyy-mm-ddThh:mm)
-  m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT]+(\d{2}):(\d{2}))?/); 
+
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT]+(\d{2}):(\d{2}))?/);
   if(m) return new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0));
-  
+
   return null;
 }
 function normalizarPrefixoManut(v){ const t = String(v||'').trim().toUpperCase(); const m = t.match(/^([A-Z]+)[\s-]*(\d+)$/); if(m){ const num = m[2].length === 1 ? '0'+m[2] : m[2]; return m[1]+'-'+num; } return t.replace(/\s+/g,' '); }
@@ -2710,7 +2708,7 @@ function renderManutGrid(){
         }
       }
       acoes += `<button class="btn whatsapp" data-action="whats" data-id="${escapeAttr(p.id)}" title="Compartilhar">${waSvgCard}</button>`;
-      
+
       const podeApagar = podeExcluirAberto;
       if(podeApagar) acoes += `<button class="btn danger" data-action="excluir" data-id="${escapeAttr(p.id)}" title="Excluir agendamento">🗑</button>`;
     } else {
@@ -2756,7 +2754,7 @@ function renderManutGrid(){
     if(tipoProc !== TIPO_AGENDAMENTO && p.aberto && p.entrada){
       const dtEntrada = parseDataManut(p.entrada.data);
       if(dtEntrada){
-        const dias = Math.floor((Date.now() - dtEntrada.getTime()) / 86400000);
+        const dias = Math.floor((getNowTime() - dtEntrada.getTime()) / 86400000);
         if(dias > 30) slaBadge = `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--vermelho);background:rgba(239,83,80,.12);border:1px solid rgba(239,83,80,.5);border-radius:20px;padding:2px 8px;font-weight:600;">🚨 ${dias}d aberto</span>`;
         else if(dias > 15) slaBadge = `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--amber);background:rgba(232,169,58,.12);border:1px solid rgba(232,169,58,.5);border-radius:20px;padding:2px 8px;font-weight:600;">⚠ ${dias}d aberto</span>`;
       }
@@ -4230,16 +4228,10 @@ function fecharSucesso(){
 
 function abrirWhatsApp(texto) {
   const textoCodificado = encodeURIComponent(texto);
-  
-  // Verifica se é um dispositivo móvel (celular/tablet)
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
   if (isMobile) {
-    // Deep link nativo do app (abre direto no aplicativo)
     window.location.href = `whatsapp://send?text=${textoCodificado}`;
   } else {
-    // No computador, abre o WhatsApp Web diretamente,
-    // pulando a página "api.whatsapp.com" de seleção[reference:2][reference:3]
     window.open(`https://web.whatsapp.com/send?text=${textoCodificado}`, '_blank');
   }
 }
