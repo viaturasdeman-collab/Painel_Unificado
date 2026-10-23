@@ -814,7 +814,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
             <div class="linha"><span>OS da troca</span><b id="pf-info-os">—</b></div>
           </div>
           <div class="prev-form-bloco">
-            <h3>Atualizar KM atual</h3>
+            <h3>Atualizar KM atual (B6)</h3>
             <div class="campo">
               <label for="pf-km">Novo KM</label>
               <input type="text" id="pf-km" placeholder="ex: 99296" inputmode="numeric" autocomplete="off">
@@ -1320,7 +1320,6 @@ if(IS_TOUCH) document.documentElement.classList.add('is-touch');
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Sincronização de Hora com a Internet (v6.7)
-// timeapi.io + fallback worldtimeapi.org — ambas CORS-friendly
 // ═══════════════════════════════════════════════════════════════════════════
 let _serverTimeOffset = 0;
 
@@ -1421,6 +1420,94 @@ function _fecharReportModal(id){
   el.classList.remove('is-open');
   el.style.display = 'none';
   document.body.classList.remove('relatorio-aberto');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Impressão com nome de arquivo personalizado + filtros ativos
+// O navegador usa document.title como nome sugerido do PDF.
+// ─────────────────────────────────────────────────────────────────────────
+function imprimirComTitulo(nomeBase){
+  const seguro = String(nomeBase || 'Relatório')
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const data = pad(d.getDate()) + '-' + pad(d.getMonth()+1) + '-' + d.getFullYear();
+  const tituloOriginal = document.title;
+  const tituloImpressao = seguro + ' ' + data;
+  document.title = tituloImpressao;
+
+  let restaurado = false;
+  function restaurar(){
+    if(restaurado) return;
+    restaurado = true;
+    document.title = tituloOriginal;
+    window.removeEventListener('afterprint', restaurar);
+  }
+  window.addEventListener('afterprint', restaurar);
+  setTimeout(restaurar, 60000);
+
+  setTimeout(() => window.print(), 50);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Nome dinâmico por relatório — lê os filtros ativos no momento do clique
+// ─────────────────────────────────────────────────────────────────────────
+function _nomeRelatorioOS(){
+  const filtros = [];
+
+  if(activeTab === TAB_MANUTENCAO) filtros.push('Manutenção');
+  else if(activeTab === TAB_GERAL) filtros.push('Visão Geral');
+  else filtros.push(activeTab);
+
+  if(activeStatusFilter) filtros.push(activeStatusFilter);
+
+  if(repFiltroStatus){
+    const info = STAGES.find(x => x.key === repFiltroStatus);
+    filtros.push(info ? info.label : repFiltroStatus);
+  }
+  if(repFiltroOficina) filtros.push('Oficina ' + repFiltroOficina);
+  if(repFiltroOrcada) filtros.push('Orçada ' + repFiltroOrcada);
+  if(repFiltroDistribuida) filtros.push('Distribuída ' + repFiltroDistribuida);
+
+  const q = ($('osSearch') && $('osSearch').value) ? $('osSearch').value.trim() : '';
+  if(q) filtros.push('busca ' + q);
+
+  return 'Relatório de OS-BAMEX' + (filtros.length ? ' (' + filtros.join(' - ') + ')' : '');
+}
+
+function _nomeRelatorioManut(){
+  const filtros = [];
+  const modo = $('manutReportMode') ? $('manutReportMode').value : 'detalhado';
+  const mes  = $('manutReportMonth') ? $('manutReportMonth').value : '';
+
+  filtros.push(modo === 'mes' ? 'Por mês' : 'Processos');
+  if(mes) filtros.push(formatarMesAno(mes).replace('/', '-'));
+  if(manutRepStatusFiltro) filtros.push(manutRepStatusFiltro);
+  if(MANUT_FILTRO_TIPO) filtros.push(MANUT_FILTRO_TIPO);
+
+  return 'Relatório de Movimentação' + (filtros.length ? ' (' + filtros.join(' - ') + ')' : '');
+}
+
+function _nomeRelatorioPreventiva(){
+  const filtros = [];
+
+  if(prevRepFiltroOleo){
+    const labels = { vermelho: 'Atrasadas', amarelo: 'Próximas', verde: 'Em dia', vazio: 'Sem dados' };
+    filtros.push(labels[prevRepFiltroOleo] || prevRepFiltroOleo);
+  }
+  if(prevRepFiltroPrevisao){
+    if(prevRepFiltroPrevisao === '__vencidas__') filtros.push('Previsão Vencidas');
+    else filtros.push('Previsão ' + formatarMesAno(prevRepFiltroPrevisao).replace('/', '-'));
+  }
+  if(prevRepFiltroKm){
+    const labels = { atrasado: 'Atrasado', curto: '0-2000km', medio: '2000-5000km', longo: 'acima-5000km', sem_dados: 'Sem dados' };
+    filtros.push(labels[prevRepFiltroKm] || prevRepFiltroKm);
+  }
+  if(prevRepFiltroBusca) filtros.push('busca ' + prevRepFiltroBusca);
+
+  return 'Relatório de Manutenção Preventiva' + (filtros.length ? ' (' + filtros.join(' - ') + ')' : '');
 }
 
 const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -3712,7 +3799,7 @@ $('ed-save').addEventListener('click', async () => {
   if(!ok){ Object.assign(rec, backup); alert('A edição não pôde ser salva. Revertida.'); renderOS(); }
 });
 $('reportBtn').addEventListener('click', () => { if(!temPermissao('os_relatorio')){ alert('Sem permissão.'); return; } abrirRelatorioOS(); });
-$('reportPrint').addEventListener('click', () => window.print());
+$('reportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioOS()));
 $('reportClose').addEventListener('click', () => _fecharReportModal('reportModal'));
 $('reportModal').addEventListener('click', e => { if(e.target.id === 'reportModal') _fecharReportModal('reportModal'); });
 
@@ -3727,7 +3814,7 @@ $('prevClearFilterBtn').addEventListener('click', () => {
   renderPreventiva();
 });
 $('prevReportBtn').addEventListener('click', () => { if(!temPermissao('ver_preventiva')){ alert('Sem permissão.'); return; } abrirRelatorioPreventiva(); });
-$('prevReportPrint').addEventListener('click', () => window.print());
+$('prevReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioPreventiva()));
 $('prevReportClose').addEventListener('click', () => _fecharReportModal('prevReportModal'));
 $('prevReportModal').addEventListener('click', e => { if(e.target.id === 'prevReportModal') _fecharReportModal('prevReportModal'); });
 
@@ -3776,7 +3863,7 @@ $('mm-status').addEventListener('change', () => trocarCampoLocal('mm-local-wrap'
 $('me-status').addEventListener('change', () => trocarCampoLocal('me-local-wrap','me-status',true, processoAtual ? processoAtual.tipo : undefined));
 $('mf-status').addEventListener('change', () => montarCampoLocalFinal());
 $('manutReportBtn').addEventListener('click', () => { if(!temPermissao('ver_manutencao')){ alert('Sem permissão.'); return; } abrirRelatorioManut(); });
-$('manutReportPrint').addEventListener('click', () => window.print());
+$('manutReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioManut()));
 $('manutReportClose').addEventListener('click', () => _fecharReportModal('manutReportModal'));
 $('manutReportModal').addEventListener('click', e => { if(e.target.id === 'manutReportModal') _fecharReportModal('manutReportModal'); });
 const selStatusManutRep = $('manutReportStatus');
