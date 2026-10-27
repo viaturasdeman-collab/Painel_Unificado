@@ -652,6 +652,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
         <div class="sidebar-submenu open" id="sidebarSubPrev">
           <button class="sidebar-sublink active" data-prev-tab="painel"><span class="icon">📊</span><span class="label">Painel</span></button>
           <button class="sidebar-sublink" data-prev-tab="atualizar" data-perm="prev_editar_km"><span class="icon">✎</span><span class="label">Atualizar</span></button>
+          <button class="sidebar-sublink" data-prev-tab="pneus" data-perm="prev_editar_km"><span class="icon">🛞</span><span class="label">Atualizar Pneus</span></button>
         </div>
       </div>
       <div class="sidebar-group" id="sidebarMovGroup" data-perm="ver_manutencao">
@@ -845,6 +846,59 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
         </div>
         <footer class="page-footer">As alterações são gravadas na aba individual de cada viatura.</footer>
       </div>
+      
+      <div class="prev-panel" id="prevPanel-pneus">
+        <div class="prev-form">
+          <h2>🛞 Registrar Manutenção de Pneus</h2>
+          <p class="help">Atualize os dados referentes à troca ou manutenção de pneus da viatura.</p>
+          
+          <div class="prev-form-bloco">
+            <h3>Viatura</h3>
+            <div class="campo">
+              <label for="pneus-busca">Prefixo ou placa</label>
+              <div class="pf-dropdown-wrap" id="pneus-busca-wrap">
+                <input type="text" id="pneus-busca" placeholder="Digite o prefixo ou placa…" autocomplete="off" autocapitalize="off">
+                <div class="pf-dropdown" id="pneus-dropdown"></div>
+              </div>
+              <span class="dica" id="pneus-busca-dica">Selecione uma viatura para continuar.</span>
+            </div>
+          </div>
+
+          <div class="prev-info-card" id="pneus-info" style="display:none;">
+            <div class="titulo">
+              <span id="pneus-info-prefixo">—</span>
+              <span class="placa" id="pneus-info-placa">—</span>
+            </div>
+          </div>
+
+          <div class="prev-form-bloco">
+            <h3>Dados dos Pneus (E18, F18, M18, P18)</h3>
+            <div class="campo">
+              <label for="pneus-data">Data da manutenção (E18)</label>
+              <input type="date" id="pneus-data">
+            </div>
+            <div class="campo">
+              <label for="pneus-km">KM da manutenção (F18)</label>
+              <input type="text" id="pneus-km" placeholder="ex: 50000" inputmode="numeric">
+            </div>
+            <div class="campo">
+              <label for="pneus-marca">Marca / Modelo (M18)</label>
+              <input type="text" id="pneus-marca" placeholder="ex: Pirelli / Scorpion">
+            </div>
+            <div class="campo">
+              <label for="pneus-os">Nº da OS (P18)</label>
+              <input type="text" id="pneus-os" placeholder="ex: 1890">
+            </div>
+          </div>
+
+          <p id="pneus-error" class="modal-error" style="margin-top:14px;"></p>
+          <div class="prev-form-actions">
+            <button class="btn ghost" id="pneus-cancel">Cancelar</button>
+            <button class="btn primary" id="pneus-save">Salvar</button>
+          </div>
+        </div>
+      </div>
+
     </section>
 
     <section class="view" id="view-manutencao">
@@ -1250,6 +1304,7 @@ const PREVENTIVA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmZ
 const DIRECT_SHEET_CSV_URL     = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR3LObOEgxM1X17aNQkaH3W5Ll5T87-ilwdJTev4answjodildll1TQcPPWqnziJPdk0OvNPf0JHsB8/pub?gid=1320680332&single=true&output=csv';
 const STORAGE_KEY_OS    = 'deman_data_os_v1';
 const STORAGE_KEY_VIAT  = 'deman_cache_viaturas_v1';
+const STORAGE_KEY_PREV  = 'deman_cache_preventiva_v1';
 const POLLING_INTERVAL  = 180000;
 const SENHA_PADRAO      = 'deman@2026';
 const ROOT_LOGIN        = 'deman';
@@ -1424,7 +1479,6 @@ function _fecharReportModal(id){
 
 // ─────────────────────────────────────────────────────────────────────────
 // Impressão com nome de arquivo personalizado + filtros ativos
-// O navegador usa document.title como nome sugerido do PDF.
 // ─────────────────────────────────────────────────────────────────────────
 function imprimirComTitulo(nomeBase){
   const seguro = String(nomeBase || 'Relatório')
@@ -2362,6 +2416,7 @@ function abrirModalMudarLocal(prefixo){
     if(normalizeStr(novoGbm) === normalizeStr(v.gbm)){ alert('O local é o mesmo.'); return false; }
     const r = await apiViaturas('mudarGbm', { prefixo, novoGbm });
     if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
     await loadDataViaturas(); return true;
   }, 'viat_mudar');
 }
@@ -2378,6 +2433,7 @@ function abrirModalPermutar(prefixo, origem, gbm){
     if(origem === 'reserva' && !novoGbm){ alert('Selecione o local de destino.'); return false; }
     const r = await apiViaturas('permutarViatura', { prefixo, destino: destinoAPI, substituto, novoGbm });
     if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
     await loadDataViaturas(); return true;
   }, 'viat_permutar');
 }
@@ -2389,6 +2445,7 @@ function abrirModalBaixar(prefixo, gbm, origem){
     const sub = $('modalSubstituto'); const substituto = sub ? sub.value : '';
     const r = await apiViaturas('baixarViatura', { prefixo, motivo, substituto });
     if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
     await loadDataViaturas(); return true;
   }, 'viat_baixar');
 }
@@ -2398,6 +2455,7 @@ function abrirModalReativar(prefixo){
     const gbm = $('modalGbm').value; if(!gbm){ alert('Selecione o local.'); return false; }
     const r = await apiViaturas('reativarViatura', { prefixo, gbm });
     if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
     await loadDataViaturas(); return true;
   }, 'viat_reativar');
 }
@@ -2405,6 +2463,7 @@ function abrirModalMoverReserva(prefixo){
   abrirModal('Mover para Reserva · '+prefixo, `<p style="font-size:13px;color:var(--text-dim);margin:0;"><b>${escapeHtml(prefixo)}</b> será movida de <b>baixadas</b> para <b>DEMAN (Reserva)</b>.</p>`, async () => {
     const r = await apiViaturas('moverBaixadaParaReserva', { prefixo });
     if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
     await loadDataViaturas(); return true;
   }, 'viat_permutar');
 }
@@ -2950,571 +3009,690 @@ function tentarConverterAgendamento(p){
     const r = await apiManut('forcarConversaoAgendamento', { idAgendamento: p.id, paralelo: false });
     if(r.ok){
       try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-      await loadDataManut();
-      mostrarSucesso({
-        titulo: 'Agendamento convertido!',
-        sub: 'Novo processo: ' + r.idNovo,
-        resumo: [['ID agendamento', p.id], ['Novo processo Viatura', r.idNovo], ['Viatura', p.viatura]],
-        mensagemWhats: ''
-      });
+            await loadDataManut();
       _conversaoPendenteId = null;
-      return;
+    } else if(r.error && String(r.error).toLowerCase().indexOf('conflito') !== -1){
+      abrirModalForcarConversao(p, r.conflitos || []);
+    } else {
+      alert('Erro: ' + (r.error || 'desconhecido'));
+      _conversaoPendenteId = null;
     }
-    if(r.requerConfirmacaoParalelo){
-      abrirModalForcarConversao(p, r.processosAbertos || []);
-      return;
-    }
-    alert('Erro: ' + (r.error || 'desconhecido'));
-    _conversaoPendenteId = null;
   })();
 }
 
-function abrirModalForcarConversao(p, processosAbertos){
-  const sub = $('forcarConversaoSub');
-  sub.innerHTML = 'A viatura <b>' + escapeHtml(p.viatura) + '</b> já tem ' + processosAbertos.length + ' processo(s) aberto(s).<br>Converter o agendamento vai gerar um <b>processo paralelo</b>.';
-  const lista = $('forcarConversaoLista');
-  lista.innerHTML = processosAbertos.map(a => `<div style="background:var(--surface-2);border:1px solid var(--border);border-left:4px solid var(--amber);border-radius:8px;padding:8px 12px;font-size:12px;">
-    <span style="font-family:'IBM Plex Mono',monospace;color:var(--amber);font-weight:600;">${escapeHtml(a.id)}</span>
-    · 📍 ${escapeHtml(a.ultimoLocal || a.entradaLocal || '—')}
-    · ${a.dias || 0}d
-  </div>`).join('');
+function abrirModalForcarConversao(p, conflitos){
+  $('forcarConversaoSub').textContent = 'A viatura ' + p.viatura + ' já possui processos abertos.';
+  $('forcarConversaoLista').innerHTML = (conflitos.length ? conflitos : [{ id:p.id, local:'—', entrada:'—' }]).map(c => `
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-left:4px solid var(--amber);border-radius:8px;padding:10px 12px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber);font-weight:600;margin-bottom:4px;">${escapeHtml(c.id)}</div>
+      <div style="font-size:12px;">📍 ${escapeHtml(c.local || '—')}</div>
+      <div style="font-size:10.5px;color:var(--text-faint);">Desde ${escapeHtml(c.entrada || '—')}</div>
+    </div>
+  `).join('');
   $('forcarConversaoErro').style.display = 'none';
   $('forcarConversaoModal').style.display = 'flex';
 }
 
-function getMesesDisponiveisManut(){
-  const set = new Set();
-  MANUT_EVENTOS.forEach(e => {
-    const d = parseDataManut(e.data);
-    if(!d) return;
-    set.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
-  });
-  return Array.from(set).sort().reverse();
+function abrirFormFinalizar(p){
+  if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
+  modoManutForm = 'finalizar';
+  processoAtual = p;
+  $('manutFormTitle').textContent = '✅ Finalizar processo';
+  $('manutFormHelp').textContent = 'Preencha os dados da saída da viatura.';
+  $('procInfoBox').style.display = 'block';
+  $('procInfoBox').innerHTML = `
+    <div class="row"><span>Viatura</span><b>${escapeHtml(p.viatura)}</b></div>
+    <div class="row"><span>ID do processo</span><b>${escapeHtml(p.id)}</b></div>
+    <div class="row"><span>Entrada</span><b>${escapeHtml(p.entrada ? p.entrada.data : '—')}</b></div>
+    <div class="row"><span>Local atual</span><b>${escapeHtml(p.ultimo && p.ultimo.local ? p.ultimo.local : '—')}</b></div>
+  `;
+  $('formCriar').style.display = 'none';
+  $('formEvento').style.display = 'none';
+  $('formFinalizar').style.display = 'grid';
+  const agora = new Date(getNowTime());
+  const pad = n => String(n).padStart(2,'0');
+  $('mf-data').value = `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+  $('mf-status').value = 'Ativa';
+  $('mf-informante').value = '';
+  $('mf-detalhes').value = '';
+  montarCampoLocalFinal();
+  $('mm-delete').style.display = 'none';
+  $('mm-save').textContent = 'Finalizar';
+  $('mm-save').dataset.modo = 'finalizar';
+  $('mm-error').style.display = 'none';
+  showManutTab('novo');
 }
-function abrirRelatorioManut(){
-  const select = $('manutReportMonth'); const meses = getMesesDisponiveisManut();
-  select.innerHTML = '<option value="">Todos os meses</option>' + meses.map(ym => `<option value="${escapeAttr(ym)}">${escapeHtml(formatarMesAno(ym))}</option>`).join('');
-  select.value = '';
-  $('manutReportMode').value = 'detalhado';
-  const selStatus = $('manutReportStatus'); if(selStatus) selStatus.value = '';
-  manutRepStatusFiltro = '';
-  const agora = new Date();
-  $('manutReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
-  renderRelatorioManut();
-  _abrirReportModal('manutReportModal');
+
+function abrirFormEvento(p){
+  if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
+  modoManutForm = 'evento';
+  processoAtual = p;
+  $('manutFormTitle').textContent = '📝 Adicionar evento';
+  $('manutFormHelp').textContent = 'Registre uma movimentação ou observação no processo.';
+  $('procInfoBox').style.display = 'block';
+  $('procInfoBox').innerHTML = `
+    <div class="row"><span>Viatura</span><b>${escapeHtml(p.viatura)}</b></div>
+    <div class="row"><span>ID</span><b>${escapeHtml(p.id)}</b></div>
+    <div class="row"><span>Status atual</span><b>${escapeHtml(statusLabelManut(p.ultimo ? p.ultimo.status : ''))}</b></div>
+  `;
+  $('formCriar').style.display = 'none';
+  $('formFinalizar').style.display = 'none';
+  $('formEvento').style.display = 'grid';
+  const agora = new Date(getNowTime());
+  const pad = n => String(n).padStart(2,'0');
+  $('me-data').value = `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+  $('me-tipo').value = 'Movimentação';
+  $('me-status').value = '';
+  $('me-solicitante').value = '';
+  $('me-informante').value = '';
+  $('me-detalhes').value = '';
+  montarCampoLocal('me-local-wrap', '', '', true, TIPO_VIATURA);
+  $('mm-delete').style.display = 'none';
+  $('mm-save').textContent = 'Adicionar';
+  $('mm-save').dataset.modo = 'evento';
+  $('mm-error').style.display = 'none';
+  showManutTab('novo');
 }
-function atualizarVisibilidadeModoManut(){
-  const modo = $('manutReportMode').value;
-  const isMes = modo === 'mes';
-  $('manutReportDetalhado').style.display = isMes ? 'none' : '';
-  $('manutReportPorMes').style.display = isMes ? '' : 'none';
-  const periodoWrap = $('manutReportPeriodWrap');
-  if(periodoWrap) periodoWrap.style.display = isMes ? 'none' : 'flex';
+
+function abrirFormCriar(){
+  if(!temPermissao('manut_criar')){ alert('Sem permissão.'); return; }
+  modoManutForm = 'criar';
+  processoAtual = null;
+  $('manutFormTitle').textContent = '🛠 Nova entrada';
+  $('manutFormHelp').textContent = 'Ao salvar, um processo com ID único será criado.';
+  $('procInfoBox').style.display = 'none';
+  $('formCriar').style.display = 'grid';
+  $('formEvento').style.display = 'none';
+  $('formFinalizar').style.display = 'none';
+  $('mm-tipo').value = '';
+  $('mm-viatura').value = '';
+  $('mm-status').value = 'Em Manutenção';
+  const agora = new Date(getNowTime());
+  const pad = n => String(n).padStart(2,'0');
+  $('mm-entrada').value = `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+  $('mm-data-ag').value = '';
+  $('mm-hora-ag').value = '08:00';
+  $('mm-solicitante').value = '';
+  $('mm-informante').value = '';
+  $('mm-detalhes').value = '';
+  montarCampoLocal('mm-local-wrap', '', 'Em Manutenção', false, '');
+  $('mm-delete').style.display = 'none';
+  $('mm-save').textContent = 'Salvar';
+  $('mm-save').dataset.modo = 'criar';
+  $('mm-error').style.display = 'none';
+  atualizarFormCriarPorTipo();
 }
-function renderRelatorioManut(){
-  atualizarVisibilidadeModoManut();
-  const modo = $('manutReportMode').value;
-  if(modo === 'mes') renderRelatorioManutPorMes();
-  else renderRelatorioManutDetalhado();
+
+function atualizarFormCriarPorTipo(){
+  const tipo = $('mm-tipo').value;
+  const isAgend = tipo === TIPO_AGENDAMENTO;
+  const isOutro = tipo === TIPO_OUTRO;
+  $('mm-entrada-label').style.display = isAgend ? 'none' : '';
+  $('mm-data-ag-label').style.display = isAgend ? '' : 'none';
+  $('mm-hora-ag-label').style.display = isAgend ? '' : 'none';
+  $('mm-viatura-label').style.display = isOutro ? 'none' : '';
+  $('mm-status-label').style.display = isOutro ? 'none' : '';
+  const statusAtual = isAgend ? 'Reserva' : $('mm-status').value;
+  montarCampoLocal('mm-local-wrap', lerLocalForm('mm-local-wrap'), statusAtual, false, tipo);
 }
-function renderRelatorioManutDetalhado(){
-  const mes = $('manutReportMonth').value;
+
+function showManutTab(tab){
+  activeManutTab = tab;
+  document.querySelectorAll('.manut-panel').forEach(p => p.classList.remove('active'));
+  const panel = $('manutPanel-' + tab); if(panel) panel.classList.add('active');
+  document.querySelectorAll('[data-manut-tab]').forEach(b => b.classList.toggle('active', b.dataset.manutTab === tab));
+}
+
+async function salvarFormManut(){
+  const err = $('mm-error'); const btn = $('mm-save');
+  err.style.display = 'none'; err.textContent = '';
+  btn.disabled = true; const oldTxt = btn.textContent; btn.textContent = 'Salvando…';
+  try{
+    if(modoManutForm === 'criar'){
+      const tipo = $('mm-tipo').value;
+      if(!tipo) throw new Error('Selecione o tipo.');
+      const payload = {
+        tipo,
+        viatura: tipo === TIPO_OUTRO ? '' : $('mm-viatura').value.trim(),
+        status: $('mm-status').value,
+        solicitante: $('mm-solicitante').value.trim(),
+        informante: $('mm-informante').value.trim(),
+        detalhes: $('mm-detalhes').value.trim(),
+        local: lerLocalForm('mm-local-wrap')
+      };
+      if(tipo === TIPO_AGENDAMENTO){
+        if(!$('mm-data-ag').value) throw new Error('Informe a data agendada.');
+        payload.data = $('mm-data-ag').value;
+        payload.hora = $('mm-hora-ag').value || '08:00';
+        payload.status = 'Reserva';
+      } else {
+        if(!payload.viatura) throw new Error('Informe a viatura.');
+        payload.data = $('mm-entrada').value;
+      }
+      const r = await apiManut('criarProcesso', payload);
+      if(!r.ok) throw new Error(r.error || 'Falha ao criar processo.');
+      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+      await loadDataManut();
+      mostrarSucesso(r.processo || {}, 'criar');
+      showManutTab('registros');
+    } else if(modoManutForm === 'evento'){
+      if(!processoAtual) throw new Error('Processo não carregado.');
+      const payload = {
+        id: processoAtual.id,
+        evento: $('me-tipo').value,
+        data: $('me-data').value,
+        status: $('me-status').value || '',
+        local: lerLocalForm('me-local-wrap'),
+        solicitante: $('me-solicitante').value.trim(),
+        informante: $('me-informante').value.trim(),
+        detalhes: $('me-detalhes').value.trim()
+      };
+      if(!payload.data) throw new Error('Informe a data do evento.');
+      const r = await apiManut('adicionarEvento', payload);
+      if(!r.ok) throw new Error(r.error || 'Falha ao adicionar evento.');
+      _ultimoEventoAdicionado[processoAtual.id] = Date.now();
+      _persistirDesfazer();
+      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+      await loadDataManut();
+      mostrarSucesso(processoAtual, 'evento');
+      showManutTab('registros');
+    } else if(modoManutForm === 'finalizar'){
+      if(!processoAtual) throw new Error('Processo não carregado.');
+      const payload = {
+        id: processoAtual.id,
+        data: $('mf-data').value,
+        status: $('mf-status').value,
+        local: lerLocalForm('mf-local-wrap'),
+        informante: $('mf-informante').value.trim(),
+        detalhes: $('mf-detalhes').value.trim()
+      };
+      if(!payload.data) throw new Error('Informe a data final.');
+      const r = await apiManut('finalizarProcesso', payload);
+      if(!r.ok) throw new Error(r.error || 'Falha ao finalizar.');
+      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+      await loadDataManut();
+      mostrarSucesso(processoAtual, 'finalizar');
+      showManutTab('registros');
+    }
+  }catch(e){
+    err.textContent = e.message || 'Erro desconhecido.';
+    err.style.display = 'block';
+  }
+  btn.disabled = false; btn.textContent = oldTxt;
+}
+
+async function excluirProcessoAtual(){
+  if(!processoAtual) return;
+  const podeApagar = processoAtual.aberto ? temPermissao('manut_excluir') : temPermissao('manut_excluir_fechado');
+  if(!podeApagar){ alert('Sem permissão.'); return; }
+  if(!confirm('Excluir o processo ' + processoAtual.id + '?')) return;
+  const r = await apiManut('removerProcesso', { id: processoAtual.id });
+  if(!r.ok){ alert('Erro: ' + r.error); return; }
+  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+  await loadDataManut();
+  showManutTab('registros');
+}
+
+// ─────────────────────────────────────────────────────────
+// Sucesso / WhatsApp
+// ─────────────────────────────────────────────────────────
+let _sucessoPayloadAtual = null;
+function mostrarSucesso(proc, modo){
+  _sucessoPayloadAtual = { proc, modo };
+  const titulo = $('sucessoTitulo'); const sub = $('sucessoSub'); const resumo = $('sucessoResumo');
+  if(modo === 'criar'){
+    titulo.textContent = 'Processo registrado!';
+    sub.textContent = 'O processo foi criado com sucesso.';
+    resumo.innerHTML = `
+      <div class="resumo-row"><span>ID</span><b>${escapeHtml(proc.id || '—')}</b></div>
+      <div class="resumo-row"><span>Viatura</span><b>${escapeHtml(proc.viatura || '—')}</b></div>
+      <div class="resumo-row"><span>Tipo</span><b>${escapeHtml(proc.tipo || '—')}</b></div>
+    `;
+  } else if(modo === 'finalizar'){
+    titulo.textContent = 'Processo finalizado!';
+    sub.textContent = 'A viatura foi liberada.';
+    resumo.innerHTML = `
+      <div class="resumo-row"><span>ID</span><b>${escapeHtml(proc.id)}</b></div>
+      <div class="resumo-row"><span>Viatura</span><b>${escapeHtml(proc.viatura)}</b></div>
+    `;
+  } else {
+    titulo.textContent = 'Evento adicionado!';
+    sub.textContent = 'O evento foi registrado no processo.';
+    resumo.innerHTML = `
+      <div class="resumo-row"><span>ID</span><b>${escapeHtml(proc.id)}</b></div>
+      <div class="resumo-row"><span>Viatura</span><b>${escapeHtml(proc.viatura)}</b></div>
+    `;
+  }
+  $('sucessoModal').style.display = 'flex';
+}
+
+function montarMensagemEntrada(p){
+  const linhas = [
+    '🛠 *Processo ' + p.id + '*',
+    '🚗 Viatura: ' + p.viatura,
+    '📥 Entrada: ' + (p.entrada ? p.entrada.data : '—'),
+    '📍 Local: ' + (p.ultimo && p.ultimo.local ? p.ultimo.local : '—'),
+    '🟡 Status: ' + statusLabelManut(p.ultimo ? p.ultimo.status : '')
+  ];
+  if(p.solicitante) linhas.push('👤 Solicitante: ' + p.solicitante);
+  if(p.entrada && p.entrada.detalhes) linhas.push('📝 ' + p.entrada.detalhes);
+  return linhas.join('\n');
+}
+
+function montarMensagemFinalizacao(p){
+  const linhas = [
+    '✅ *Processo finalizado — ' + p.id + '*',
+    '🚗 Viatura: ' + p.viatura,
+    '📥 Entrada: ' + (p.entrada ? p.entrada.data : '—'),
+    '📤 Saída: ' + (p.finalizacao ? p.finalizacao.data : '—'),
+    '📍 Status final: ' + statusLabelManut(p.finalizacao ? p.finalizacao.status : '')
+  ];
+  if(p.dias > 0) linhas.push('⏱ Duração: ' + p.dias + ' dia(s)');
+  if(p.finalizacao && p.finalizacao.detalhes) linhas.push('📝 ' + p.finalizacao.detalhes);
+  return linhas.join('\n');
+}
+
+function abrirWhatsApp(msg){
+  const url = 'https://wa.me/' + (WHATSAPP_DESTINO ? WHATSAPP_DESTINO : '') + '?text=' + encodeURIComponent(msg);
+  window.open(url, '_blank');
+}
+
+// ─────────────────────────────────────────────────────────
+// Relatório de Manutenção
+// ─────────────────────────────────────────────────────────
+function manutReportPopularMeses(){
   const grupos = agruparPorProcesso();
-  let procs = Object.values(grupos);
-  if(mes){
-    procs = procs.filter(p => {
-      const d = parseDataManut(p.entrada ? p.entrada.data : '');
-      if(!d) return false;
-      return (d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')) === mes;
-    });
-  }
-  if(manutRepStatusFiltro){
-    const alvoClasse = statusClasseManut(manutRepStatusFiltro);
-    procs = procs.filter(p => statusClasseManut(p.ultimo ? p.ultimo.status : '') === alvoClasse);
-  }
-  procs.sort((a, b) => {
-    const da = parseDataManut(a.entrada ? a.entrada.data : '');
-    const db = parseDataManut(b.entrada ? b.entrada.data : '');
-    return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
+  const meses = new Set();
+  Object.values(grupos).forEach(g => {
+    if(g.entrada && g.entrada.data){
+      const d = parseDataManut(g.entrada.data);
+      if(d) meses.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+    }
   });
-  const filtroTxt = mes ? 'Mês: ' + formatarMesAno(mes) : 'Todos os meses';
-  const statusTxt = manutRepStatusFiltro ? ' · Status: ' + escapeHtml(manutRepStatusFiltro) : '';
-  $('manutReportFilters').innerHTML = '<b>' + escapeHtml(filtroTxt) + '</b>' + statusTxt + ' · <b>Processos:</b> ' + procs.length;
+  const sel = $('manutReportMonth');
+  sel.innerHTML = '<option value="">Todos os meses</option>' +
+    Array.from(meses).sort().reverse().map(m => `<option value="${m}">${formatarMesAno(m)}</option>`).join('');
+}
+
+function manutReportAplicarFiltros(grupos){
+  const mes = $('manutReportMonth').value;
+  const statusF = $('manutReportStatus').value;
+  let ids = Object.keys(grupos);
+  if(mes) ids = ids.filter(id => {
+    const g = grupos[id];
+    if(!g.entrada || !g.entrada.data) return false;
+    const d = parseDataManut(g.entrada.data);
+    return d && (d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')) === mes;
+  });
+  if(statusF) ids = ids.filter(id => {
+    const g = grupos[id];
+    const label = statusLabelManut(g.ultimo ? g.ultimo.status : '');
+    if(statusF === 'Agendado') return g.tipo === TIPO_AGENDAMENTO && g.aberto && !g.agendamentoConvertido;
+    if(statusF === 'Convertido') return g.tipo === TIPO_AGENDAMENTO && g.agendamentoConvertido;
+    return label === statusF;
+  });
+  return ids.map(id => grupos[id]);
+}
+
+function manutReportRenderDetalhado(procs){
+  $('manutReportDetalhado').style.display = '';
+  $('manutReportPorMes').style.display = 'none';
   $('manutReportBody').innerHTML = procs.length === 0
-    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhum processo neste período</td></tr>'
+    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhum registro encontrado</td></tr>'
     : procs.map(p => {
-        const cor = corStatus(statusClasseManut(p.ultimo ? p.ultimo.status : ''));
-        const entrada = p.entrada ? p.entrada.data : '—';
-        const saida = p.finalizacao ? p.finalizacao.data : '--';
-        const statusL = statusLabelManut(p.ultimo ? p.ultimo.status : '');
-        const temDias = p.finalizacao && p.dias > 0;
-        const diasTxt = temDias ? p.dias + 'd' : '—';
-        const diasClass = temDias ? 'dias' : 'dias vazio';
-        const inf = p.finalizacao ? p.finalizacao.informante : (p.entrada ? p.entrada.informante : '—');
-        const tipoProc = p.tipo || TIPO_VIATURA;
-        const tipoClass = tipoProc === TIPO_OUTRO ? 'outro' : (tipoProc === TIPO_AGENDAMENTO ? 'agendamento' : 'viatura');
+        const dias = p.finalizacao ? p.dias : Math.floor((getNowTime() - (parseDataManut(p.entrada ? p.entrada.data : '')?.getTime() || getNowTime())) / 86400000);
         return `<tr>
           <td class="id">${escapeHtml(p.id)}</td>
-          <td><span class="manut-proc-tipo ${tipoClass}">${escapeHtml(tipoProc)}</span></td>
+          <td>${escapeHtml(p.tipo || '—')}</td>
           <td class="v">${escapeHtml(p.viatura)}</td>
-          <td class="date">${escapeHtml(entrada)}</td>
-          <td class="date">${escapeHtml(saida)}</td>
-          <td class="status" style="color:${cor};">● ${escapeHtml(statusL)}</td>
-          <td class="${diasClass}">${escapeHtml(diasTxt)}</td>
+          <td class="date">${escapeHtml(p.entrada ? p.entrada.data : '—')}</td>
+          <td class="date">${escapeHtml(p.finalizacao ? p.finalizacao.data : '—')}</td>
+          <td class="status">${escapeHtml(statusLabelManut(p.ultimo ? p.ultimo.status : ''))}</td>
+          <td class="dias">${dias > 0 ? dias + 'd' : '—'}</td>
           <td style="text-align:center;">${p.eventos.length}</td>
-          <td class="info">${escapeHtml(inf)}</td>
+          <td class="info">${escapeHtml(p.entrada && p.entrada.informante ? p.entrada.informante : '—')}</td>
         </tr>`;
       }).join('');
 }
-function renderRelatorioManutPorMes(){
-  const grupos = {};
-  MANUT_EVENTOS.forEach(e => {
-    if(manutRepStatusFiltro){
-      const alvoClasse = statusClasseManut(manutRepStatusFiltro);
-      if(statusClasseManut(e.status) !== alvoClasse) return;
-    }
-    const d = parseDataManut(e.data);
+
+function manutReportRenderPorMes(procs){
+  $('manutReportDetalhado').style.display = 'none';
+  $('manutReportPorMes').style.display = '';
+  const porMes = {};
+  procs.forEach(p => {
+    if(!p.entrada || !p.entrada.data) return;
+    const d = parseDataManut(p.entrada.data);
     if(!d) return;
-    const ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-    if(!grupos[ym]) grupos[ym] = {};
-    if(!grupos[ym][e.viatura]) grupos[ym][e.viatura] = { eventos: 0, dias: 0 };
-    grupos[ym][e.viatura].eventos += 1;
-    if(normalizeStr(e.evento).indexOf('finaliz') !== -1){
-      grupos[ym][e.viatura].dias += extrairDiasNumericos(e.dias);
-    }
+    const k = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    (porMes[k] = porMes[k] || []).push(p);
   });
-  const meses = Object.keys(grupos).sort().reverse();
-  let totalGeralEventos = 0;
-  Object.keys(grupos).forEach(ym => { Object.keys(grupos[ym]).forEach(pfx => { totalGeralEventos += grupos[ym][pfx].eventos; }); });
-  const statusTxt = manutRepStatusFiltro ? ' · Status: ' + escapeHtml(manutRepStatusFiltro) : '';
-  $('manutReportFilters').innerHTML = '<b>Modo:</b> Por mês (agrupado)' + statusTxt + ' · <b>Meses:</b> ' + meses.length + ' · <b>Eventos totais:</b> ' + totalGeralEventos;
-  const container = $('manutReportMesContent');
-  if(meses.length === 0){
-    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-faint);">Nenhum registro encontrado</div>';
-    return;
-  }
-  container.innerHTML = meses.map(ym => {
-    const viaturas = Object.keys(grupos[ym]).sort((a,b)=>a.localeCompare(b));
-    let totalEventosMes = 0, totalDiasMes = 0;
-    const linhas = viaturas.map(pfx => {
-      const info = grupos[ym][pfx];
-      totalEventosMes += info.eventos;
-      totalDiasMes += info.dias;
-      return `<tr><td class="v">${escapeHtml(pfx)}</td><td class="status" style="text-align:center;">${info.eventos}</td><td class="dias">${info.dias}d</td></tr>`;
-    }).join('');
-    return `<div class="mes-group"><div class="mes-header"><span>${escapeHtml(formatarMesAno(ym))}</span><span class="mes-count">${totalEventosMes} evento${totalEventosMes>1?'s':''} · ${viaturas.length} viatura${viaturas.length>1?'s':''}</span></div><table class="report-table"><thead><tr><th>Viatura</th><th style="text-align:center;">Eventos</th><th style="text-align:right;">Dias fechados</th></tr></thead><tbody>${linhas}<tr class="total-row"><td>TOTAL DO MÊS</td><td style="text-align:center;">${totalEventosMes}</td><td style="text-align:right;">${totalDiasMes}d</td></tr></tbody></table></div>`;
+  const html = Object.keys(porMes).sort().reverse().map(k => {
+    const lista = porMes[k];
+    return `<div class="mes-group">
+      <div class="mes-header">
+        <span>${formatarMesAno(k)}</span>
+        <span class="mes-count">${lista.length} processo(s)</span>
+      </div>
+      <table class="report-table">
+        <thead><tr><th>ID</th><th>Viatura</th><th>Entrada</th><th>Saída</th><th>Status</th><th style="text-align:right;">Dias</th></tr></thead>
+        <tbody>${lista.map(p => {
+          const dias = p.finalizacao ? p.dias : '';
+          return `<tr>
+            <td class="id">${escapeHtml(p.id)}</td>
+            <td class="v">${escapeHtml(p.viatura)}</td>
+            <td class="date">${escapeHtml(p.entrada ? p.entrada.data : '—')}</td>
+            <td class="date">${escapeHtml(p.finalizacao ? p.finalizacao.data : '—')}</td>
+            <td class="status">${escapeHtml(statusLabelManut(p.ultimo ? p.ultimo.status : ''))}</td>
+            <td class="dias ${dias ? '' : 'vazio'}">${dias ? dias + 'd' : '—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
   }).join('');
+  $('manutReportMesContent').innerHTML = html || '<div class="empty">Nenhum registro encontrado.</div>';
+}
+
+function manutReportRender(){
+  const grupos = agruparPorProcesso();
+  const procs = manutReportAplicarFiltros(grupos);
+  const modo = $('manutReportMode').value;
+  $('manutReportPeriodWrap').style.display = modo === 'mes' ? 'flex' : 'none';
+  if(modo === 'mes') manutReportRenderPorMes(procs); else manutReportRenderDetalhado(procs);
+  const filtrosAtivos = [];
+  if($('manutReportMonth').value) filtrosAtivos.push(formatarMesAno($('manutReportMonth').value));
+  if($('manutReportStatus').value) filtrosAtivos.push($('manutReportStatus').value);
+  $('manutReportFilters').innerHTML = '<b>Total:</b> ' + procs.length + ' processo(s)' + (filtrosAtivos.length ? ' · <b>Filtros:</b> ' + filtrosAtivos.join(' · ') : '');
+}
+
+function abrirRelatorioManut(){
+  manutReportPopularMeses();
+  const agora = new Date();
+  $('manutReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
+  manutReportRender();
+  _abrirReportModal('manutReportModal');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PREVENTIVA
+// MANUTENÇÃO PREVENTIVA
 // ═══════════════════════════════════════════════════════════════════════════
-const STORAGE_KEY_PREV = 'deman_cache_preventiva_v1';
-const PREV_CACHE_TTL   = 15 * 60 * 1000;
 let PREV_VIATURAS = [];
-let PREV_FILTRO_SITUACAO = '';
-let PREV_FILTRO_OLEO = '';
-function parseDataBR(str){
-  var m = String(str||'').match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if(!m) return null;
-  var d = new Date(+m[3], +m[2]-1, +m[1]);
-  if(d.getFullYear() < 1950) return null;
-  return d;
-}
-function formatarGarantiaPrev(g){
-  var s = String(g||'').trim().toUpperCase();
-  if(!s || s === '0') return '—';
-  if(s.indexOf('VENCID') !== -1) return 'Garantia VENCIDA';
-  var m = s.match(/FAZER\s+(\d)/);
-  if(m) return 'Garantia na ' + m[1] + '\u00AA revis\u00E3o';
-  return s;
-}
-function fmtKm(n){
-  if(n == null || isNaN(n)) return '—';
-  return Number(n).toLocaleString('pt-BR') + ' km';
-}
+let PREV_TAB_ATUAL = 'painel';
+let prevFiltroSituacao = '';
+let prevFiltroOleo = '';
+let prevFiltroTexto = '';
+let prevRepFiltroOleo = '';
+let prevRepFiltroPrevisao = '';
+let prevRepFiltroKm = '';
+let prevRepFiltroBusca = '';
+
+function normalizarPlacaPrev(s){ return String(s || '').trim().toUpperCase().replace(/[\s-]+/g, ''); }
+
 async function loadDataPreventiva(){
-  if(activeView !== 'preventiva' && !PREV_VIATURAS.length) return;
-  var upd = $('prevUpdateStatus'); if(!upd) return;
-  if(!PREVENTIVA_APPS_SCRIPT_URL || PREVENTIVA_APPS_SCRIPT_URL.indexOf('COLE_AQUI') !== -1){
-    upd.textContent = 'Backend não configurado.';
-    $('prevContent').innerHTML = '<div class="prev-empty">Backend não configurado.</div>';
-    return;
-  }
+  const upd = $('prevUpdateStatus');
+  const CACHE_KEY_PREV = 'deman_cache_preventiva_v2';
+  const TTL = 2 * 60 * 1000;
   try{
-    var raw = sessionStorage.getItem(STORAGE_KEY_PREV);
+    const raw = sessionStorage.getItem(CACHE_KEY_PREV);
     if(raw){
-      var p = JSON.parse(raw);
-      if(p && Array.isArray(p.viaturas) && (Date.now() - p.ts) < PREV_CACHE_TTL){
+      const p = JSON.parse(raw);
+      if(p && Array.isArray(p.viaturas) && (Date.now() - p.ts) < TTL){
         PREV_VIATURAS = p.viaturas;
         upd.textContent = 'Cache · ' + new Date(p.ts).toLocaleTimeString('pt-BR');
-        renderPreventiva();
+        if(activeView === 'preventiva') renderPreventiva();
+        return;
       }
     }
   }catch(e){}
   upd.textContent = 'Atualizando…';
   try{
-    var r = await apiPrev('listarPreventiva');
+    const r = await apiPrev('listarPreventiva');
     if(!r.ok){ upd.textContent = 'Falha: ' + (r.error || 'desconhecido'); return; }
     PREV_VIATURAS = Array.isArray(r.viaturas) ? r.viaturas : [];
-    try{ sessionStorage.setItem(STORAGE_KEY_PREV, JSON.stringify({ ts: Date.now(), viaturas: PREV_VIATURAS })); }catch(e){}
+    try{ sessionStorage.setItem(CACHE_KEY_PREV, JSON.stringify({ ts: Date.now(), viaturas: PREV_VIATURAS })); }catch(e){}
     upd.textContent = 'Atualizado em ' + new Date().toLocaleTimeString('pt-BR');
-    renderPreventiva();
+    if(activeView === 'preventiva') renderPreventiva();
   }catch(err){
-    console.error(err);
     upd.textContent = 'Erro: ' + err.message;
   }
 }
-function renderCardPreventiva(v){
-  var cor = v.statusOleo || 'vazio';
-  var faixaLabel, faixaValor, faixaIcone;
-  if(cor === 'vazio'){
-    faixaLabel = 'Sem dados de km';
-  } else {
-    faixaValor = Math.abs(v.falta || 0);
-    faixaLabel = (v.falta <= 0 ? 'PASSOU ' : 'FALTAM ') + faixaValor.toLocaleString('pt-BR') + ' km';
-    faixaIcone = cor === 'vermelho' ? '🔴 ' : (cor === 'amarelo' ? '🟡 ' : '🟢 ');
-  }
-  var dataProx = v.proximaTroca || '';
-  var dataVencida = false;
-  if(dataProx){
-    var d = parseDataBR(dataProx);
-    if(d && d < new Date()) dataVencida = true;
-  }
-  var kmProxAtrasada = (v.kmProxima != null && v.kmAtual != null && v.kmProxima <= v.kmAtual);
-  return '<div class="prev-card ' + cor + '">' +
-    '<div class="prev-head">' +
-      '<div class="prev-titulo">' +
-        '<span class="prev-prefixo">' + escapeHtml(v.prefixo) + '</span>' +
-        '<span class="prev-placa">' + escapeHtml(v.placa) + '</span>' +
-      '</div>' +
-      '<div class="prev-sub">' +
-        '<span>' + escapeHtml(v.situacao || '—') + '</span>' +
-        '<span class="sep">·</span>' +
-        '<span>' + escapeHtml(formatarGarantiaPrev(v.garantia)) + '</span>' +
-      '</div>' +
-    '</div>' +
-    '<div class="prev-body">' +
-      '<div class="prev-row"><span class="lbl">KM atual</span><span class="val">' + fmtKm(v.kmAtual) + '</span></div>' +
-      '<div class="prev-row"><span class="lbl">Pr\u00F3x. troca</span><span class="val' + (kmProxAtrasada ? ' atraso' : '') + '">' + fmtKm(v.kmProxima) + '</span></div>' +
-      (v.osTroca ? '<div class="prev-row"><span class="lbl">OS troca</span><span class="val">' + escapeHtml(v.osTroca) + '</span></div>' : '') +
-      '<div class="prev-data">📅 ' + (dataProx || '—') + (dataVencida ? ' <span class="vencida">· vencida</span>' : '') + '</div>' +
-    '</div>' +
-    '<div class="prev-faixa ' + cor + '">' + (faixaIcone || '') + escapeHtml(faixaLabel) + '</div>' +
-  '</div>';
-}
-function renderPreventiva(){
-  if(activeView !== 'preventiva') return;
-  var container = $('prevContent'); if(!container) return;
-  var q = normalizeStr($('prevSearch').value);
-  var lista = PREV_VIATURAS.slice();
-  if(PREV_FILTRO_SITUACAO){
-    var alvo = normalizeStr(PREV_FILTRO_SITUACAO);
-    lista = lista.filter(function(v){ return normalizeStr(v.situacao).indexOf(alvo) !== -1; });
-  }
-  if(PREV_FILTRO_OLEO){
-    lista = lista.filter(function(v){ return v.statusOleo === PREV_FILTRO_OLEO; });
-  }
-  if(q){
-    lista = lista.filter(function(v){
-      return normalizeStr(v.prefixo).indexOf(q) !== -1 || normalizeStr(v.placa).indexOf(q) !== -1;
-    });
-  }
-  var ordem = { vermelho:0, amarelo:1, verde:2, vazio:3 };
-  lista.sort(function(a, b){
-    var oa = ordem[a.statusOleo] == null ? 3 : ordem[a.statusOleo];
-    var ob = ordem[b.statusOleo] == null ? 3 : ordem[b.statusOleo];
-    if(oa !== ob) return oa - ob;
-    return String(a.prefixo).localeCompare(String(b.prefixo));
-  });
-  var qtdAtrasadas = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'vermelho'; }).length;
-  var qtdProximas  = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'amarelo'; }).length;
-  var qtdEmDia     = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'verde'; }).length;
-  var clsAtras = PREV_FILTRO_OLEO === 'vermelho' ? ' active-filter' : '';
-  var clsProx  = PREV_FILTRO_OLEO === 'amarelo'  ? ' active-filter' : '';
-  var clsDia   = PREV_FILTRO_OLEO === 'verde'    ? ' active-filter' : '';
-  $('prevSummary').innerHTML =
-    '<div class="summary-card baixadas' + clsAtras + '" data-prev-filter="vermelho"><div class="label">🔴 Óleo atrasado (km)</div><div class="value">' + qtdAtrasadas + '</div></div>' +
-    '<div class="summary-card manut-abertos' + clsProx + '" data-prev-filter="amarelo"><div class="label">🟡 Próximas da troca</div><div class="value">' + qtdProximas + '</div></div>' +
-    '<div class="summary-card manut-fechados' + clsDia + '" data-prev-filter="verde"><div class="label">🟢 Em dia</div><div class="value">' + qtdEmDia + '</div></div>';
-  document.querySelectorAll('#prevSummary .summary-card').forEach(function(card){
-    card.addEventListener('click', function(){
-      var f = card.dataset.prevFilter;
-      PREV_FILTRO_OLEO = (PREV_FILTRO_OLEO === f) ? '' : f;
-      var sel = $('prevFiltroOleo'); if(sel) sel.value = PREV_FILTRO_OLEO;
-      renderPreventiva();
-    });
-  });
-  if(lista.length === 0){
-    container.innerHTML = '<div class="prev-empty">Nenhuma viatura encontrada.</div>';
-    var cb0 = $('prevClearFilterBtn'); if(cb0) cb0.style.display = (PREV_FILTRO_SITUACAO || PREV_FILTRO_OLEO || q) ? 'inline-block' : 'none';
-    return;
-  }
-  container.innerHTML = lista.map(renderCardPreventiva).join('');
-  var cb = $('prevClearFilterBtn');
-  if(cb) cb.style.display = (PREV_FILTRO_SITUACAO || PREV_FILTRO_OLEO || q) ? 'inline-block' : 'none';
+
+function calcularSituacaoOleo(v){
+  if(!v.kmAtual || !v.kmTroca) return 'vazio';
+  const diff = (v.kmTroca || 0) + 10000 - (v.kmAtual || 0);
+  if(diff <= 0) return 'vermelho';
+  if(diff <= 2000) return 'amarelo';
+  return 'verde';
 }
 
-let PREV_TAB_ATUAL = 'painel';
-let PREV_LISTA_COMPLETA = [];
-let PREV_VIATURA_SELECIONADA = null;
-function setSidebarPrevExpanded(v){
-  var sub = $('sidebarSubPrev'); var parent = $('sidebarPrevParent');
-  if(sub) sub.classList.toggle('open', !!v);
-  if(parent) parent.classList.toggle('expanded', !!v);
+function renderPrevSummary(){
+  const total = PREV_VIATURAS.length;
+  const vermelho = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'vermelho').length;
+  const amarelo = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'amarelo').length;
+  const verde = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'verde').length;
+  const semDados = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'vazio').length;
+  $('prevSummary').innerHTML = `
+    <div class="summary-card total"><div class="label">Total</div><div class="value">${total}</div></div>
+    <div class="summary-card manut-dias"><div class="label">🔴 Atrasadas</div><div class="value">${vermelho}</div></div>
+    <div class="summary-card manut-abertos"><div class="label">🟡 Próximas</div><div class="value">${amarelo}</div></div>
+    <div class="summary-card manut-fechados"><div class="label">🟢 Em dia</div><div class="value">${verde}</div></div>
+    <div class="summary-card"><div class="label">— Sem dados</div><div class="value">${semDados}</div></div>
+  `;
 }
-function showPrevTab(name){
-  if(name !== 'painel' && name !== 'atualizar') return;
-  if(name === 'atualizar' && !temPermissao('prev_editar_km')) name = 'painel';
-  PREV_TAB_ATUAL = name;
-  document.querySelectorAll('#sidebarSubPrev .sidebar-sublink').forEach(b => { b.classList.toggle('active', b.dataset.prevTab === name); });
-  var pPainel = $('prevPanel-painel'); var pAtual = $('prevPanel-atualizar');
-  if(pPainel) pPainel.classList.toggle('active', name === 'painel');
-  if(pAtual)  pAtual.classList.toggle('active', name === 'atualizar');
-  setSidebarPrevExpanded(true);
-  window.scrollTo(0, 0);
-  if(name === 'atualizar'){
-    if(PREV_LISTA_COMPLETA.length === 0) loadListaCompletaPreventiva();
-    setTimeout(() => { var i = $('pf-busca'); if(i) i.focus({ preventScroll: true }); }, 60);
+
+function renderPrevCards(){
+  const q = normalizeStr(prevFiltroTexto);
+  let lista = PREV_VIATURAS.filter(v => {
+    if(prevFiltroSituacao && normalizeStr(v.situacao) !== normalizeStr(prevFiltroSituacao)) return false;
+    if(prevFiltroOleo){
+      const sit = calcularSituacaoOleo(v);
+      if(sit !== prevFiltroOleo) return false;
+    }
+    if(q && !normalizeStr(v.prefixo).includes(q) && !normalizeStr(v.placa).includes(q)) return false;
+    return true;
+  });
+  if(lista.length === 0){
+    $('prevContent').innerHTML = '<div class="prev-empty">Nenhuma viatura encontrada.</div>';
+    return;
   }
+  lista.sort((a,b) => a.prefixo.localeCompare(b.prefixo));
+  $('prevContent').innerHTML = lista.map(v => {
+    const sit = calcularSituacaoOleo(v);
+    const labels = { vermelho:'🔴 ATRASADA', amarelo:'🟡 PRÓXIMA', verde:'🟢 EM DIA', vazio:'— SEM DADOS' };
+    const diff = (v.kmAtual && v.kmTroca) ? ((v.kmTroca || 0) + 10000 - (v.kmAtual || 0)) : null;
+    const atraso = diff !== null && diff < 0;
+    return `<div class="prev-card ${sit}">
+      <div class="prev-head">
+        <div class="prev-titulo">
+          <span class="prev-prefixo">${escapeHtml(v.prefixo)}</span>
+          <span class="prev-placa">${escapeHtml(v.placa || '—')}</span>
+        </div>
+        <div class="prev-sub">
+          <span>${escapeHtml(v.situacao || '—')}</span>
+          <span class="sep">·</span>
+          <span>${escapeHtml(v.gbm || '—')}</span>
+        </div>
+      </div>
+      <div class="prev-body">
+        <div class="prev-row"><span class="lbl">KM atual</span><span class="val">${v.kmAtual ? Number(v.kmAtual).toLocaleString('pt-BR') : '—'}</span></div>
+        <div class="prev-row"><span class="lbl">KM da troca</span><span class="val">${v.kmTroca ? Number(v.kmTroca).toLocaleString('pt-BR') : '—'}</span></div>
+        <div class="prev-row"><span class="lbl">Data da troca</span><span class="val">${escapeHtml(v.dataTroca || '—')}</span></div>
+        <div class="prev-row"><span class="lbl">OS da troca</span><span class="val">${escapeHtml(v.osTroca || '—')}</span></div>
+        <div class="prev-row"><span class="lbl">Falta</span><span class="val ${atraso?'atraso':''}">${diff !== null ? Number(diff).toLocaleString('pt-BR') + ' km' : '—'}</span></div>
+      </div>
+      <div class="prev-faixa ${sit}">${labels[sit]}</div>
+    </div>`;
+  }).join('');
 }
-async function loadListaCompletaPreventiva(){
-  try{
-    var r = await apiPrev('listarTodasViaturas');
-    if(!r.ok){ console.error('listarTodasViaturas:', r.error); return; }
-    PREV_LISTA_COMPLETA = Array.isArray(r.viaturas) ? r.viaturas : [];
-  }catch(e){ console.error(e); }
+
+function renderPreventiva(){
+  if(activeView !== 'preventiva') return;
+  renderPrevSummary();
+  renderPrevCards();
+  const clearBtn = $('prevClearFilterBtn');
+  if(clearBtn) clearBtn.style.display = (prevFiltroSituacao || prevFiltroOleo || prevFiltroTexto) ? 'inline-block' : 'none';
 }
-function _fmtKmPrev(n){ if(n == null || isNaN(n)) return '—'; return Number(n).toLocaleString('pt-BR') + ' km'; }
-function _fmtDataISOparaBR(iso){
-  if(!iso) return '';
-  var p = String(iso).split('-');
-  if(p.length !== 3) return iso;
-  return p[2] + '/' + p[1] + '/' + p[0];
+
+function showPrevTab(tab){
+  PREV_TAB_ATUAL = tab;
+  document.querySelectorAll('.prev-panel').forEach(p => p.classList.remove('active'));
+  const panel = $('prevPanel-' + tab); if(panel) panel.classList.add('active');
+  document.querySelectorAll('[data-prev-tab]').forEach(b => b.classList.toggle('active', b.dataset.prevTab === tab));
+  if(tab === 'pneus' && !PREV_VIATURAS.length) loadDataPreventiva();
 }
-function selecionarViaturaPreventiva(prefixo){
-  var v = PREV_LISTA_COMPLETA.find(function(x){ return x.prefixo === prefixo; });
-  if(!v) return;
-  PREV_VIATURA_SELECIONADA = v;
+
+// ─── Dropdown de busca (compartilhado por atualizar e pneus) ───
+function renderDropdownGenerico(prefixo, filtro, onSelect){
+  const drop = $(prefixo + '-dropdown');
+  const q = normalizeStr(filtro);
+  if(!q){ drop.classList.remove('open'); drop.innerHTML = ''; return; }
+  const matches = PREV_VIATURAS.filter(v =>
+    normalizeStr(v.prefixo).includes(q) || normalizeStr(v.placa).includes(q)
+  ).slice(0, 20);
+  if(matches.length === 0){
+    drop.innerHTML = '<div class="pf-dropdown-empty">Nenhuma viatura encontrada.</div>';
+    drop.classList.add('open'); return;
+  }
+  drop.innerHTML = matches.map(v => `
+    <div class="pf-dropdown-item" data-prefixo="${escapeAttr(v.prefixo)}">
+      <span class="pf-di-prefix">${escapeHtml(v.prefixo)}</span>
+      <span class="pf-di-placa">${escapeHtml(v.placa || '—')}</span>
+    </div>
+  `).join('');
+  drop.classList.add('open');
+  drop.querySelectorAll('.pf-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const v = matches.find(x => x.prefixo === item.dataset.prefixo);
+      if(v) onSelect(v);
+      drop.classList.remove('open');
+    });
+  });
+}
+
+// ─── Atualizar KM / troca de óleo ───
+let _viaturaSelecionadaPrev = null;
+function selecionarViaturaPrev(v){
+  _viaturaSelecionadaPrev = v;
+  $('pf-busca').value = v.prefixo + ' — ' + (v.placa || '');
+  $('pf-dropdown').classList.remove('open');
   $('pf-info').classList.add('show');
-  $('pf-info-prefixo').textContent = v.prefixo + (v.locado ? ' · locada' : '');
+  $('pf-info-prefixo').textContent = v.prefixo;
   $('pf-info-placa').textContent = v.placa || '—';
-  $('pf-info-km').textContent = _fmtKmPrev(v.kmAtual);
-  $('pf-info-data').textContent = v.ultimaTroca || '—';
-  $('pf-info-kmtroca').textContent = _fmtKmPrev(v.kmUltima);
+  $('pf-info-km').textContent = v.kmAtual ? Number(v.kmAtual).toLocaleString('pt-BR') : '—';
+  $('pf-info-data').textContent = v.dataTroca || '—';
+  $('pf-info-kmtroca').textContent = v.kmTroca ? Number(v.kmTroca).toLocaleString('pt-BR') : '—';
   $('pf-info-os').textContent = v.osTroca || '—';
   $('pf-busca-dica').textContent = 'Viatura selecionada.';
-  atualizarDicaKm();
-}
-function atualizarDicaKm(){
-  var dica = $('pf-km-dica'); if(!dica) return;
-  var raw = $('pf-km').value.trim();
-  if(!raw){ dica.textContent = '—'; dica.className = 'dica'; return; }
-  var n = parseFloat(raw.replace(/\./g,'').replace(',', '.'));
-  if(isNaN(n)){ dica.textContent = 'Valor inválido.'; dica.className = 'dica negativo'; return; }
-  if(!PREV_VIATURA_SELECIONADA || PREV_VIATURA_SELECIONADA.kmAtual == null){
-    dica.textContent = 'Sem referência anterior.'; dica.className = 'dica'; return;
-  }
-  var antigo = PREV_VIATURA_SELECIONADA.kmAtual;
-  var dif = n - antigo;
-  var sinal = dif >= 0 ? '+' : '';
-  dica.textContent = sinal + dif.toLocaleString('pt-BR') + ' km (antes: ' + antigo.toLocaleString('pt-BR') + ')';
-  dica.className = 'dica ' + (dif < 0 ? 'negativo' : 'positivo');
-}
-function limparFormularioPreventiva(){
-  PREV_VIATURA_SELECIONADA = null;
-  $('pf-busca').value = '';
-  $('pf-busca-dica').textContent = 'Digite para filtrar. Selecione uma viatura para continuar.';
-  $('pf-info').classList.remove('show');
-  $('pf-km').value = '';
-  $('pf-km-dica').textContent = '—';
-  $('pf-km-dica').className = 'dica';
+  $('pf-busca-dica').className = 'dica positivo';
+  $('pf-km').value = v.kmAtual || '';
   $('pf-data').value = '';
   $('pf-kmtroca').value = '';
   $('pf-os').value = '';
-  $('pf-error').style.display = 'none';
-  $('pf-error').textContent = '';
-  fecharDropdownViaturas();
-}
-async function salvarPreventivaForm(){
-  var err = $('pf-error'); var btn = $('pf-save');
-  err.style.display = 'none'; err.textContent = '';
-  if(!PREV_VIATURA_SELECIONADA){ err.textContent = 'Selecione uma viatura primeiro.'; err.style.display = 'block'; return; }
-  var kmRaw = $('pf-km').value.trim();
-  var dataTroca = $('pf-data').value;
-  var kmTrocaRaw = $('pf-kmtroca').value.trim();
-  var osTroca = $('pf-os').value.trim();
-  var temKm = kmRaw !== '';
-  var preencheuAlgoTroca = (dataTroca || kmTrocaRaw || osTroca);
-  var trocaCompleta = (dataTroca && kmTrocaRaw && osTroca);
-  if(!temKm && !preencheuAlgoTroca){ err.textContent = 'Preencha o KM atual ou os campos da troca.'; err.style.display = 'block'; return; }
-  if(preencheuAlgoTroca && !trocaCompleta){ err.textContent = 'A troca de óleo precisa dos 3 campos: data, KM e OS.'; err.style.display = 'block'; return; }
-  if(temKm && PREV_VIATURA_SELECIONADA.kmAtual != null){
-    var novoKm = parseFloat(kmRaw.replace(/\./g,'').replace(',', '.'));
-    if(!isNaN(novoKm) && novoKm < PREV_VIATURA_SELECIONADA.kmAtual){
-      var antigoFmt = PREV_VIATURA_SELECIONADA.kmAtual.toLocaleString('pt-BR');
-      var novoFmt = novoKm.toLocaleString('pt-BR');
-      if(!confirm('⚠️ O novo KM (' + novoFmt + ') é menor que o atual (' + antigoFmt + ').\n\nConfirma?')) return;
-    }
-  }
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  var payload = { prefixo: PREV_VIATURA_SELECIONADA.prefixo };
-  if(temKm) payload.novoKm = kmRaw;
-  if(trocaCompleta){
-    payload.dataTroca = _fmtDataISOparaBR(dataTroca);
-    payload.kmTroca = kmTrocaRaw;
-    payload.osTroca = osTroca;
-  }
-  let r;
-  try {
-    r = await apiPrev('salvarPreventiva', payload);
-  } catch(e){
-    err.textContent = 'Erro inesperado: ' + (e.message || e);
-    err.style.display = 'block';
-    return;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Salvar';
-  }
-  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
-  var resumo = [];
-  if(r.acoes && r.acoes.km){
-    var a = r.acoes.km;
-    var dif = a.diferenca != null ? (a.diferenca >= 0 ? '+' : '') + a.diferenca.toLocaleString('pt-BR') : '—';
-    resumo.push(['KM atual', (a.kmAntigo != null ? a.kmAntigo.toLocaleString('pt-BR') : '—') + ' → ' + a.kmNovo.toLocaleString('pt-BR') + ' (' + dif + ')']);
-  }
-  if(r.acoes && r.acoes.troca){
-    var t = r.acoes.troca;
-    resumo.push(['Data da troca', t.dataTroca]);
-    resumo.push(['KM da troca', Number(t.kmTroca).toLocaleString('pt-BR') + ' km']);
-    resumo.push(['OS da troca', t.osTroca]);
-  }
-  limparFormularioPreventiva();
-  try{ sessionStorage.removeItem(STORAGE_KEY_PREV); }catch(e){}
-  await Promise.all([loadListaCompletaPreventiva(), loadDataPreventiva()]);
-  mostrarSucesso({ titulo: 'Manutenção registrada!', sub: 'Viatura: ' + payload.prefixo, resumo: resumo, mensagemWhats: '' });
-}
-function _normalizaBusca(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
-function renderDropdownViaturas(){
-  const input = $('pf-busca'); const dropdown = $('pf-dropdown');
-  if(!input || !dropdown) return;
-  const termo = _normalizaBusca(input.value);
-  if(!termo){ dropdown.classList.remove('open'); dropdown.innerHTML = ''; return; }
-  const matches = PREV_LISTA_COMPLETA.filter(v => {
-    const pfx = _normalizaBusca(v.prefixo);
-    const placa = _normalizaBusca(v.placa || '');
-    return pfx.indexOf(termo) !== -1 || placa.indexOf(termo) !== -1;
-  }).slice(0, 30);
-  if(matches.length === 0){
-    dropdown.innerHTML = '<div class="pf-dropdown-empty">Nenhuma viatura encontrada para "' + escapeHtml(input.value) + '"</div>';
-    dropdown.classList.add('open');
-    return;
-  }
-  dropdown.innerHTML = matches.map(v => {
-    const placaTxt = v.placa ? v.placa : '—';
-    const locTxt = v.locado ? ' · locada' : '';
-    return `<div class="pf-dropdown-item" data-prefixo="${escapeAttr(v.prefixo)}">
-      <span class="pf-di-prefix">${escapeHtml(v.prefixo)}${escapeHtml(locTxt)}</span>
-      <span class="pf-di-placa">${escapeHtml(placaTxt)}</span>
-    </div>`;
-  }).join('');
-  dropdown.classList.add('open');
-  dropdown.querySelectorAll('.pf-dropdown-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const pfx = item.dataset.prefixo;
-      input.value = pfx;
-      selecionarViaturaPreventiva(pfx);
-      fecharDropdownViaturas();
-    });
-  });
-}
-function fecharDropdownViaturas(){
-  const dropdown = $('pf-dropdown');
-  if(dropdown) dropdown.classList.remove('open');
-}
-function _handlePfBuscaInput(){
-  const input = $('pf-busca'); if(!input) return;
-  const val = input.value.trim().toUpperCase();
-  const exato = PREV_LISTA_COMPLETA.find(v => v.prefixo.toUpperCase() === val);
-  if(exato){ selecionarViaturaPreventiva(exato.prefixo); fecharDropdownViaturas(); return; }
-  PREV_VIATURA_SELECIONADA = null;
-  $('pf-info').classList.remove('show');
-  $('pf-busca-dica').textContent = 'Digite para filtrar. Selecione uma viatura para continuar.';
-  renderDropdownViaturas();
+  $('pf-km-dica').textContent = v.kmAtual ? 'KM atual: ' + Number(v.kmAtual).toLocaleString('pt-BR') : '—';
+  $('pf-km-dica').className = 'dica';
 }
 
-let prevRepFiltroOleo = '';
-let prevRepFiltroPrevisao = '';
-let prevRepFiltroKm = '';
-let prevRepFiltroBusca = '';
-function calcularPrevisaoTroca(v){
-  if(v.falta != null && v.falta <= 0){ return { data: new Date(), vencida: true, origem: 'atrasada' }; }
-  if(v.proximaTroca){
-    const d = parseDataBR(v.proximaTroca);
-    if(d && d.getFullYear() >= 2020){ return { data: d, vencida: false, origem: 'planilha' }; }
-  }
-  if(v.kmAtual != null && v.kmProxima != null && v.falta != null && v.falta > 0){
-    let kmPorMes = 1500;
-    if(v.ultimaTroca && v.kmUltima != null && v.kmUltima < v.kmAtual){
-      const dtUltima = parseDataBR(v.ultimaTroca);
-      if(dtUltima && dtUltima.getTime() < Date.now()){
-        const meses = Math.max(0.5, (Date.now() - dtUltima.getTime()) / (30 * 86400000));
-        const kmRodados = v.kmAtual - v.kmUltima;
-        if(kmRodados > 100) kmPorMes = kmRodados / meses;
-      }
-    }
-    if(kmPorMes > 0 && isFinite(kmPorMes)){
-      const mesesAte = Math.min(120, v.falta / kmPorMes);
-      const previsao = new Date();
-      previsao.setDate(previsao.getDate() + Math.round(mesesAte * 30));
-      return { data: previsao, vencida: false, origem: 'estimada' };
-    }
-  }
-  return null;
+async function salvarPreventivaForm(){
+  const err = $('pf-error'); err.style.display = 'none';
+  if(!_viaturaSelecionadaPrev){ err.textContent = 'Selecione uma viatura.'; err.style.display = 'block'; return; }
+  const kmNovo = $('pf-km').value.trim();
+  const dataT = $('pf-data').value.trim();
+  const kmT = $('pf-kmtroca').value.trim();
+  const osT = $('pf-os').value.trim();
+  const temTroca = dataT || kmT || osT;
+  if(!kmNovo && !temTroca){ err.textContent = 'Preencha o KM atual ou os dados da troca.'; err.style.display = 'block'; return; }
+  if(temTroca && (!dataT || !kmT || !osT)){ err.textContent = 'Preencha os três campos da troca ou deixe os três vazios.'; err.style.display = 'block'; return; }
+  const btn = $('pf-save'); btn.disabled = true; btn.textContent = 'Salvando…';
+  const payload = {
+    prefixo: _viaturaSelecionadaPrev.prefixo,
+    kmAtual: kmNovo || null,
+    dataTroca: dataT || null,
+    kmTroca: kmT || null,
+    osTroca: osT || null
+  };
+  const r = await apiPrev('atualizarPreventiva', payload);
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(!r.ok){ err.textContent = r.error || 'Falha ao salvar.'; err.style.display = 'block'; return; }
+  try{ sessionStorage.removeItem('deman_cache_preventiva_v2'); }catch(e){}
+  await loadDataPreventiva();
+  $('pf-cancel').click();
+  alert('Dados salvos com sucesso!');
 }
-function prevRepPopularPrevisao(lista){
-  const meses = new Set();
-  let temVencidas = false;
-  lista.forEach(v => {
-    const p = calcularPrevisaoTroca(v);
-    if(!p) return;
-    if(p.vencida){ temVencidas = true; return; }
-    meses.add(p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0'));
+
+// ─── Pneus ───
+let _viaturaSelecionadaPneu = null;
+function selecionarViaturaPneu(v){
+  _viaturaSelecionadaPneu = v;
+  $('pneus-busca').value = v.prefixo + ' — ' + (v.placa || '');
+  $('pneus-dropdown').classList.remove('open');
+  $('pneus-info').style.display = 'block';
+  $('pneus-info-prefixo').textContent = v.prefixo;
+  $('pneus-info-placa').textContent = v.placa || '—';
+  $('pneus-busca-dica').textContent = 'Viatura selecionada.';
+  $('pneus-busca-dica').className = 'dica positivo';
+  $('pneus-data').value = '';
+  $('pneus-km').value = '';
+  $('pneus-marca').value = '';
+  $('pneus-os').value = '';
+}
+
+async function salvarPneusForm(){
+  const err = $('pneus-error'); err.style.display = 'none';
+  if(!_viaturaSelecionadaPneu){ err.textContent = 'Selecione uma viatura.'; err.style.display = 'block'; return; }
+  const data = $('pneus-data').value.trim();
+  const km = $('pneus-km').value.trim();
+  const marca = $('pneus-marca').value.trim();
+  const os = $('pneus-os').value.trim();
+  if(!data && !km && !marca && !os){ err.textContent = 'Preencha ao menos um campo.'; err.style.display = 'block'; return; }
+  const btn = $('pneus-save'); btn.disabled = true; btn.textContent = 'Salvando…';
+  const payload = {
+    prefixo: _viaturaSelecionadaPneu.prefixo,
+    data: data || null,
+    km: km || null,
+    marca: marca || null,
+    os: os || null
+  };
+  const r = await apiPrev('salvarPneus', payload);
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(!r.ok){ err.textContent = r.error || 'Falha ao salvar pneus.'; err.style.display = 'block'; return; }
+  try{ sessionStorage.removeItem('deman_cache_preventiva_v2'); }catch(e){}
+  await loadDataPreventiva();
+  $('pneus-cancel').click();
+  alert('Dados de pneus salvos com sucesso!');
+}
+
+// ─── Relatório Preventiva ───
+function prevRepPopularPrevisao(){
+  const set = new Set();
+  PREV_VIATURAS.forEach(v => {
+    const sit = calcularSituacaoOleo(v);
+    if(sit === 'vermelho') set.add('__vencidas__');
+    if(v.kmAtual && v.kmTroca){
+      const restante = (v.kmTroca || 0) + 10000 - (v.kmAtual || 0);
+      if(restante > 0 && restante < 5000) set.add('__proximas__');
+    }
   });
-  const sel = $('prevRepFilterPrevisao'); if(!sel) return;
-  const mesesOrd = Array.from(meses).sort();
-  let html = '<option value="">Todas</option>';
-  if(temVencidas) html += '<option value="__vencidas__">⚠ Vencidas (atrasadas)</option>';
-  html += mesesOrd.map(ym => {
-    const selAttr = (prevRepFiltroPrevisao === ym) ? ' selected' : '';
-    return `<option value="${escapeAttr(ym)}"${selAttr}>${escapeHtml(formatarMesAno(ym))}</option>`;
-  }).join('');
-  sel.innerHTML = html;
-  sel.value = prevRepFiltroPrevisao;
+  const sel = $('prevRepFilterPrevisao');
+  sel.innerHTML = '<option value="">Todas</option>' +
+    (set.has('__vencidas__') ? '<option value="__vencidas__">Vencidas</option>' : '') +
+    (set.has('__proximas__') ? '<option value="__proximas__">Próximas (até 5.000 km)</option>' : '');
 }
-function prevRepAplicarFiltros(lista){
-  return lista.filter(v => {
-    if(prevRepFiltroOleo && v.statusOleo !== prevRepFiltroOleo) return false;
+
+function prevRepAplicarFiltros(){
+  return PREV_VIATURAS.filter(v => {
+    const sit = calcularSituacaoOleo(v);
+    if(prevRepFiltroOleo && sit !== prevRepFiltroOleo) return false;
     if(prevRepFiltroPrevisao){
-      const p = calcularPrevisaoTroca(v);
-      if(prevRepFiltroPrevisao === '__vencidas__'){
-        if(!p || !p.vencida) return false;
-      } else {
-        if(!p || p.vencida) return false;
-        const ym = p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0');
-        if(ym !== prevRepFiltroPrevisao) return false;
-      }
+      const restante = (v.kmAtual && v.kmTroca) ? ((v.kmTroca || 0) + 10000 - (v.kmAtual || 0)) : null;
+      if(prevRepFiltroPrevisao === '__vencidas__' && sit !== 'vermelho') return false;
+      if(prevRepFiltroPrevisao === '__proximas__' && !(restante !== null && restante > 0 && restante < 5000)) return false;
     }
     if(prevRepFiltroKm){
-      if(prevRepFiltroKm === 'sem_dados'){
-        if(v.kmAtual != null && v.kmProxima != null) return false;
-      } else {
-        if(v.falta == null || v.kmAtual == null || v.kmProxima == null) return false;
-        if(prevRepFiltroKm === 'atrasado' && v.falta > 0) return false;
-        if(prevRepFiltroKm === 'curto' && (v.falta <= 0 || v.falta > 2000)) return false;
-        if(prevRepFiltroKm === 'medio' && (v.falta <= 2000 || v.falta > 5000)) return false;
-        if(prevRepFiltroKm === 'longo' && v.falta <= 5000) return false;
-      }
+      const restante = (v.kmAtual && v.kmTroca) ? ((v.kmTroca || 0) + 10000 - (v.kmAtual || 0)) : null;
+      if(prevRepFiltroKm === 'atrasado' && !(restante !== null && restante <= 0)) return false;
+      if(prevRepFiltroKm === 'curto' && !(restante !== null && restante > 0 && restante <= 2000)) return false;
+      if(prevRepFiltroKm === 'medio' && !(restante !== null && restante > 2000 && restante <= 5000)) return false;
+      if(prevRepFiltroKm === 'longo' && !(restante !== null && restante > 5000)) return false;
+      if(prevRepFiltroKm === 'sem_dados' && !(restante === null)) return false;
     }
     if(prevRepFiltroBusca){
       const q = normalizeStr(prevRepFiltroBusca);
@@ -3523,885 +3701,364 @@ function prevRepAplicarFiltros(lista){
     return true;
   });
 }
-function prevRepRenderKpis(lista){
-  const total = lista.length;
-  const atrasadas = lista.filter(v => v.statusOleo === 'vermelho').length;
-  const proximas = lista.filter(v => v.statusOleo === 'amarelo').length;
-  const emDia = lista.filter(v => v.statusOleo === 'verde').length;
-  const semDados = lista.filter(v => v.statusOleo === 'vazio').length;
-  const semPrevisao = lista.filter(v => !calcularPrevisaoTroca(v)).length;
+
+function prevRepRenderKpis(dados){
+  const total = dados.length;
+  const verm = dados.filter(v => calcularSituacaoOleo(v) === 'vermelho').length;
+  const ama = dados.filter(v => calcularSituacaoOleo(v) === 'amarelo').length;
+  const vde = dados.filter(v => calcularSituacaoOleo(v) === 'verde').length;
   $('prevReportKpis').innerHTML = `
     <div class="report-kpi kpi-total"><div class="kpi-label">Total</div><div class="kpi-value">${total}</div></div>
-    <div class="report-kpi kpi-pend"><div class="kpi-label">🔴 Atrasadas</div><div class="kpi-value" style="color:var(--vermelho);">${atrasadas}</div></div>
-    <div class="report-kpi kpi-qnt"><div class="kpi-label">🟡 Próximas</div><div class="kpi-value" style="color:var(--amber);">${proximas}</div></div>
-    <div class="report-kpi kpi-final"><div class="kpi-label">🟢 Em dia</div><div class="kpi-value" style="color:var(--verde);">${emDia}</div></div>
-    <div class="report-kpi kpi-aprov"><div class="kpi-label">— Sem dados</div><div class="kpi-value" style="color:var(--text-faint);">${semDados}</div></div>
-    <div class="report-kpi kpi-dist"><div class="kpi-label">Sem previsão</div><div class="kpi-value">${semPrevisao}</div></div>
+    <div class="report-kpi kpi-pend"><div class="kpi-label">🔴 Atrasadas</div><div class="kpi-value">${verm}</div></div>
+    <div class="report-kpi kpi-aprov"><div class="kpi-label">🟡 Próximas</div><div class="kpi-value">${ama}</div></div>
+    <div class="report-kpi kpi-final"><div class="kpi-label">🟢 Em dia</div><div class="kpi-value">${vde}</div></div>
   `;
 }
+
 function prevRepRenderTabela(){
-  const base = PREV_VIATURAS.slice();
-  const dados = prevRepAplicarFiltros(base);
+  const dados = prevRepAplicarFiltros();
   prevRepRenderKpis(dados);
-  const partes = [];
-  if(prevRepFiltroOleo){
-    const labels = { vermelho: 'Atrasadas', amarelo: 'Próximas', verde: 'Em dia', vazio: 'Sem dados' };
-    partes.push('Situação: ' + labels[prevRepFiltroOleo]);
-  }
-  if(prevRepFiltroPrevisao){
-    if(prevRepFiltroPrevisao === '__vencidas__') partes.push('Previsão: Vencidas');
-    else partes.push('Previsão: ' + formatarMesAno(prevRepFiltroPrevisao));
-  }
-  if(prevRepFiltroKm){
-    const labels = { atrasado: 'Atrasado', curto: '0–2.000', medio: '2.000–5.000', longo: '>5.000', sem_dados: 'Sem dados' };
-    partes.push('KM: ' + labels[prevRepFiltroKm]);
-  }
-  if(prevRepFiltroBusca) partes.push('Busca: "' + prevRepFiltroBusca + '"');
-  $('prevRepFilterResumo').innerHTML =
-    '<b>Filtros:</b> ' + (partes.length ? partes.map(escapeHtml).join(' · ') : 'nenhum') +
-    ' · <b>Exibindo:</b> ' + dados.length + ' de ' + base.length + ' viaturas';
-  const ordenado = dados.slice().sort((a, b) => {
-    const pa = calcularPrevisaoTroca(a); const pb = calcularPrevisaoTroca(b);
-    const ta = pa ? pa.data.getTime() : Infinity; const tb = pb ? pb.data.getTime() : Infinity;
-    if(ta !== tb) return ta - tb;
-    return a.prefixo.localeCompare(b.prefixo);
-  });
-  const hoje = new Date();
+  const filtros = [];
+  if(prevRepFiltroOleo) filtros.push('Estado: ' + prevRepFiltroOleo);
+  if(prevRepFiltroPrevisao) filtros.push('Previsão: ' + prevRepFiltroPrevisao);
+  if(prevRepFiltroKm) filtros.push('KM: ' + prevRepFiltroKm);
+  if(prevRepFiltroBusca) filtros.push('Busca: ' + prevRepFiltroBusca);
+  $('prevRepFilterResumo').innerHTML = '<b>Total:</b> ' + dados.length + ' de ' + PREV_VIATURAS.length + (filtros.length ? ' · <b>Filtros:</b> ' + filtros.join(' · ') : '');
+  const labels = { vermelho:'🔴 Atrasada', amarelo:'🟡 Próxima', verde:'🟢 Em dia', vazio:'— Sem dados' };
+  const ordenado = dados.slice().sort((a,b) => a.prefixo.localeCompare(b.prefixo));
   $('prevReportBody').innerHTML = ordenado.length === 0
-    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhuma viatura encontrada com os filtros atuais</td></tr>'
+    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhum registro encontrado</td></tr>'
     : ordenado.map(v => {
-        const p = calcularPrevisaoTroca(v);
-        let prevTxt = '—'; let prevCor = 'var(--text-faint)';
-        if(p){
-          if(p.vencida){ prevTxt = '⚠ VENCIDA'; prevCor = 'var(--vermelho)'; }
-          else {
-            prevTxt = p.data.toLocaleDateString('pt-BR');
-            if(p.origem === 'estimada') prevTxt += ' (est.)';
-            prevCor = p.data < new Date(hoje.getTime() + 30*86400000) ? 'var(--amber)' : 'var(--text)';
-          }
-        }
-        const faltaTxt = v.falta != null
-          ? (v.falta <= 0 ? '+' + Math.abs(v.falta).toLocaleString('pt-BR') + ' passou' : v.falta.toLocaleString('pt-BR') + ' km')
-          : '—';
-        const faltaCor = v.falta != null && v.falta <= 0 ? 'var(--vermelho)' : (v.falta != null && v.falta <= 2000 ? 'var(--amber)' : 'var(--text-dim)');
-        const statusOleoLabel = { vermelho: '🔴 Atrasada', amarelo: '🟡 Próxima', verde: '🟢 Em dia', vazio: '— Sem dados' }[v.statusOleo] || '—';
-        const statusOleoCor = { vermelho: 'var(--vermelho)', amarelo: 'var(--amber)', verde: 'var(--verde)' }[v.statusOleo] || 'var(--text-faint)';
+        const sit = calcularSituacaoOleo(v);
+        const restante = (v.kmAtual && v.kmTroca) ? ((v.kmTroca || 0) + 10000 - (v.kmAtual || 0)) : null;
+        const previsao = restante === null ? '—' : (restante <= 0 ? 'Vencida' : (restante < 2000 ? 'Até 2 mil km' : (restante < 5000 ? 'Até 5 mil km' : '> 5 mil km')));
         return `<tr>
           <td class="v">${escapeHtml(v.prefixo)}</td>
-          <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${escapeHtml(v.placa || '—')}</td>
-          <td style="font-size:11px;color:var(--text-dim);">${escapeHtml(v.situacao || '—')}</td>
-          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${v.kmAtual != null ? v.kmAtual.toLocaleString('pt-BR') : '—'}</td>
-          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${v.kmProxima != null ? v.kmProxima.toLocaleString('pt-BR') : '—'}</td>
-          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:${faltaCor};">${faltaTxt}</td>
-          <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${prevCor};">${prevTxt}</td>
-          <td style="font-size:11px;color:${statusOleoCor};">${statusOleoLabel}</td>
-          <td style="font-size:11px;color:var(--text-dim);">${escapeHtml(formatarGarantiaPrev(v.garantia) || '—')}</td>
+          <td class="info">${escapeHtml(v.placa || '—')}</td>
+          <td>${escapeHtml(v.situacao || '—')}</td>
+          <td class="dias">${v.kmAtual ? Number(v.kmAtual).toLocaleString('pt-BR') : '—'}</td>
+          <td class="dias">${v.kmTroca ? Number((v.kmTroca||0)+10000).toLocaleString('pt-BR') : '—'}</td>
+          <td class="dias ${restante !== null && restante < 0 ? '' : 'vazio'}">${restante !== null ? Number(restante).toLocaleString('pt-BR') : '—'}</td>
+          <td>${escapeHtml(previsao)}</td>
+          <td class="status">${labels[sit]}</td>
+          <td>${v.osTroca ? escapeHtml(v.osTroca) : '—'}</td>
         </tr>`;
       }).join('');
 }
+
 function abrirRelatorioPreventiva(){
-  if(!PREV_VIATURAS.length){ alert('Carregando dados… Aguarde um instante e tente novamente.'); loadDataPreventiva(); return; }
   prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
-  $('prevRepFilterOleo').value = ''; $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = '';
-  prevRepPopularPrevisao(PREV_VIATURAS);
+  prevRepPopularPrevisao();
   const agora = new Date();
   $('prevReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
-  const selOleo = $('prevRepFilterOleo'); const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
-  if(selOleo && !selOleo.dataset.bound){ selOleo.dataset.bound = '1'; selOleo.addEventListener('change', () => { prevRepFiltroOleo = selOleo.value; prevRepRenderTabela(); }); }
-  if(selPrev && !selPrev.dataset.bound){ selPrev.dataset.bound = '1'; selPrev.addEventListener('change', () => { prevRepFiltroPrevisao = selPrev.value; prevRepRenderTabela(); }); }
-  if(selKm && !selKm.dataset.bound){ selKm.dataset.bound = '1'; selKm.addEventListener('change', () => { prevRepFiltroKm = selKm.value; prevRepRenderTabela(); }); }
-  if(inpBusca && !inpBusca.dataset.bound){ inpBusca.dataset.bound = '1'; inpBusca.addEventListener('input', debounce(() => { prevRepFiltroBusca = inpBusca.value; prevRepRenderTabela(); }, 180)); }
-  if(btnLimpar && !btnLimpar.dataset.bound){
-    btnLimpar.dataset.bound = '1';
-    btnLimpar.addEventListener('click', () => {
-      prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
-      selOleo.value = ''; selPrev.value = ''; selKm.value = ''; inpBusca.value = '';
-      prevRepRenderTabela();
-    });
-  }
   prevRepRenderTabela();
   _abrirReportModal('prevReportModal');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// BINDINGS
+// ═══════════════════════════════════════════════════════════════════════════
+function bindTudo(){
+  // Menu / sidebar
+  $('menuToggle').addEventListener('click', () => {
+    if(isMobile()) $('app').classList.toggle('sidebar-open');
+    else $('app').classList.toggle('sidebar-collapsed');
+  });
+  $('sidebarBackdrop').addEventListener('click', () => $('app').classList.remove('sidebar-open'));
+  document.querySelectorAll('.sidebar-link[data-view]').forEach(b => {
+    b.addEventListener('click', () => showView(b.dataset.view));
+  });
+  $('sidebarPrevParent').addEventListener('click', () => {
+    const sub = $('sidebarSubPrev');
+    const aberto = sub.classList.toggle('open');
+    $('sidebarPrevParent').classList.toggle('expanded', aberto);
+    if(aberto) showView('preventiva');
+  });
+  $('sidebarMovParent').addEventListener('click', () => {
+    const sub = $('sidebarSubMov');
+    const aberto = sub.classList.toggle('open');
+    $('sidebarMovParent').classList.toggle('expanded', aberto);
+    if(aberto) showView('manutencao');
+  });
+  document.querySelectorAll('[data-prev-tab]').forEach(b => {
+    b.addEventListener('click', () => { showView('preventiva'); showPrevTab(b.dataset.prevTab); });
+  });
+  document.querySelectorAll('[data-manut-tab]').forEach(b => {
+    b.addEventListener('click', () => {
+      showView('manutencao');
+      const tab = b.dataset.manutTab;
+      if(tab === 'novo'){
+        if(temPermissao('manut_criar')) abrirFormCriar();
+      } else {
+        showManutTab('registros');
+      }
+    });
+  });
+  $('logoutBtn').addEventListener('click', () => { if(confirm('Deseja sair?')) handleLogout(); });
+
+  // Login
+  $('loginBtn').addEventListener('click', handleLogin);
+  $('loginPass').addEventListener('keydown', e => { if(e.key === 'Enter') handleLogin(); });
+  bindPasswordToggles();
+
+  // OS
+  $('osSearch').addEventListener('input', debounce(() => { if(activeView === 'os') renderOS(); }, 250));
+  $('clearFilterBtn').addEventListener('click', () => { activeStatusFilter = null; renderOS(); });
+  $('reportBtn').addEventListener('click', abrirRelatorioOS);
+  $('addBtn').addEventListener('click', () => { $('addForm').classList.toggle('open'); });
+  $('af-cancel').addEventListener('click', () => { $('addForm').classList.remove('open'); });
+  $('af-stage').innerHTML = STAGES.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
+  $('af-save').addEventListener('click', async () => {
+    const v = $('af-v').value.trim();
+    if(!v){ alert('Informe a viatura.'); return; }
+    const data = {
+      viatura: v,
+      os: $('af-os').value.trim(),
+      categoria: $('af-cat').value.trim(),
+      empresa: $('af-empresa').value.trim(),
+      stage: $('af-stage').value,
+      orcada: $('af-orcada').value,
+      qnt: $('af-qnt').value.trim(),
+      nota: $('af-note').value.trim()
+    };
+    const ok = await createOSInSheet(data);
+    if(ok){ $('addForm').classList.remove('open'); ['af-v','af-os','af-cat','af-empresa','af-qnt','af-note'].forEach(id => $(id).value=''); try{ sessionStorage.removeItem('deman_cache_os_v2'); }catch(e){} await loadDataOS(); }
+    else alert('Falha ao criar OS.');
+  });
+  $('ed-cancel').addEventListener('click', closeEditModal);
+  $('ed-save').addEventListener('click', async () => {
+    if(!editingRecordId) return;
+    const rec = OS_DATA.find(r => r.id === editingRecordId); if(!rec) return;
+    const data = {
+      viatura: $('ed-v').value.trim(),
+      os: $('ed-os').value.trim(),
+      categoria: $('ed-cat').value.trim(),
+      empresa: $('ed-empresa').value.trim(),
+      stage: $('ed-stage').value,
+      orcada: $('ed-orcada').value,
+      qnt: $('ed-qnt').value.trim(),
+      distribuida: $('ed-distribuida').value,
+      qtdDist: $('ed-qtd-dist').value.trim(),
+      nota: $('ed-note').value.trim()
+    };
+    const ok = await editOSInSheet(rec.os, rec.v, data);
+    if(ok){ closeEditModal(); await loadDataOS(); } else alert('Falha ao editar.');
+  });
+  $('reportClose').addEventListener('click', () => _fecharReportModal('reportModal'));
+  $('reportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioOS()));
+
+  // Viaturas
+  $('viatSearch').addEventListener('input', debounce(() => { if(activeView === 'viaturas') renderViaturas(); }, 250));
+  $('viatClearFilterBtn').addEventListener('click', () => { activeFilter = 'todas'; $('viatSearch').value = ''; renderViaturas(); });
+
+  // Preventiva — painel
+  $('prevFiltroSituacao').addEventListener('change', e => { prevFiltroSituacao = e.target.value; renderPreventiva(); });
+  $('prevFiltroOleo').addEventListener('change', e => { prevFiltroOleo = e.target.value; renderPreventiva(); });
+  $('prevSearch').addEventListener('input', debounce(e => { prevFiltroTexto = e.target.value; renderPreventiva(); }, 250));
+  $('prevClearFilterBtn').addEventListener('click', () => {
+    prevFiltroSituacao = ''; prevFiltroOleo = ''; prevFiltroTexto = '';
+    $('prevFiltroSituacao').value = ''; $('prevFiltroOleo').value = ''; $('prevSearch').value = '';
+    renderPreventiva();
+  });
+  $('prevReportBtn').addEventListener('click', abrirRelatorioPreventiva);
+
+  // Preventiva — atualizar
+  $('pf-busca').addEventListener('input', debounce(e => renderDropdownGenerico('pf', e.target.value, selecionarViaturaPrev), 150));
+  $('pf-cancel').addEventListener('click', () => {
+    _viaturaSelecionadaPrev = null;
+    $('pf-busca').value = ''; $('pf-km').value = ''; $('pf-data').value = ''; $('pf-kmtroca').value = ''; $('pf-os').value = '';
+    $('pf-info').classList.remove('show');
+    $('pf-busca-dica').textContent = 'Digite para filtrar. Selecione uma viatura para continuar.';
+    $('pf-busca-dica').className = 'dica';
+    $('pf-error').style.display = 'none';
+  });
+  $('pf-save').addEventListener('click', salvarPreventivaForm);
+
+  // Preventiva — pneus
+  $('pneus-busca').addEventListener('input', debounce(e => renderDropdownGenerico('pneus', e.target.value, selecionarViaturaPneu), 150));
+  $('pneus-cancel').addEventListener('click', () => {
+    _viaturaSelecionadaPneu = null;
+    $('pneus-busca').value = ''; $('pneus-data').value = ''; $('pneus-km').value = ''; $('pneus-marca').value = ''; $('pneus-os').value = '';
+    $('pneus-info').style.display = 'none';
+    $('pneus-busca-dica').textContent = 'Selecione uma viatura para continuar.';
+    $('pneus-busca-dica').className = 'dica';
+    $('pneus-error').style.display = 'none';
+  });
+  $('pneus-save').addEventListener('click', salvarPneusForm);
+
+  // Preventiva — relatório
+  $('prevReportClose').addEventListener('click', () => _fecharReportModal('prevReportModal'));
+  $('prevReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioPreventiva()));
+  $('prevRepFilterOleo').addEventListener('change', e => { prevRepFiltroOleo = e.target.value; prevRepRenderTabela(); });
+  $('prevRepFilterPrevisao').addEventListener('change', e => { prevRepFiltroPrevisao = e.target.value; prevRepRenderTabela(); });
+  $('prevRepFilterKm').addEventListener('change', e => { prevRepFiltroKm = e.target.value; prevRepRenderTabela(); });
+  $('prevRepFilterBusca').addEventListener('input', debounce(e => { prevRepFiltroBusca = e.target.value; prevRepRenderTabela(); }, 200));
+  $('prevRepFilterLimpar').addEventListener('click', () => {
+    prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
+    $('prevRepFilterOleo').value = ''; $('prevRepFilterPrevisao').value = ''; $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = '';
+    prevRepRenderTabela();
+  });
+
+  // Manutenção — filtros e busca
+  $('manutSearch').addEventListener('input', debounce(() => { if(activeView === 'manutencao') renderManut(); }, 250));
+  $('manutFiltroTipo').addEventListener('change', e => { MANUT_FILTRO_TIPO = e.target.value; renderManut(); });
+  $('manutClearFilterBtn').addEventListener('click', () => {
+    MANUT_FILTRO_STATUS = 'abertos'; MANUT_FILTRO_TIPO = ''; $('manutFiltroTipo').value = ''; $('manutSearch').value = '';
+    renderManut();
+  });
+  $('manutReportBtn').addEventListener('click', abrirRelatorioManut);
+  $('manutReportMode').addEventListener('change', manutReportRender);
+  $('manutReportMonth').addEventListener('change', manutReportRender);
+  $('manutReportStatus').addEventListener('change', manutReportRender);
+  $('manutReportClose').addEventListener('click', () => _fecharReportModal('manutReportModal'));
+  $('manutReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioManut()));
+
+  // Manutenção — form
+  $('mm-tipo').addEventListener('change', atualizarFormCriarPorTipo);
+  $('mm-status').addEventListener('change', () => trocarCampoLocal('mm-local-wrap', 'mm-status', false, $('mm-tipo').value));
+  $('me-status').addEventListener('change', () => trocarCampoLocal('me-local-wrap', 'me-status', true, TIPO_VIATURA));
+  $('mm-cancel').addEventListener('click', () => {
+    processoAtual = null;
+    showManutTab('registros');
+  });
+  $('mm-save').addEventListener('click', salvarFormManut);
+  $('mm-delete').addEventListener('click', excluirProcessoAtual);
+  $('forcarConversaoCriarParalelo').addEventListener('click', async () => {
+    if(!_conversaoPendenteId) return;
+    const btn = $('forcarConversaoCriarParalelo'); btn.disabled = true; btn.textContent = 'Convertendo…';
+    const r = await apiManut('forcarConversaoAgendamento', { idAgendamento: _conversaoPendenteId, paralelo: true });
+    btn.disabled = false; btn.textContent = 'Criar em paralelo mesmo assim';
+    if(!r.ok){ $('forcarConversaoErro').textContent = r.error || 'Falha.'; $('forcarConversaoErro').style.display = 'block'; return; }
+    $('forcarConversaoModal').style.display = 'none';
+    _conversaoPendenteId = null;
+    try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+    await loadDataManut();
+  });
+  $('forcarConversaoCancelar').addEventListener('click', () => { $('forcarConversaoModal').style.display = 'none'; _conversaoPendenteId = null; });
+  $('multiProcessosClose').addEventListener('click', () => { $('multiProcessosModal').style.display = 'none'; });
+  $('sucessoVoltar').addEventListener('click', () => { $('sucessoModal').style.display = 'none'; });
+  $('sucessoWhats').addEventListener('click', () => {
+    if(!_sucessoPayloadAtual) return;
+    const msg = _sucessoPayloadAtual.modo === 'finalizar'
+      ? montarMensagemFinalizacao(_sucessoPayloadAtual.proc)
+      : montarMensagemEntrada(_sucessoPayloadAtual.proc);
+    abrirWhatsApp(msg);
+  });
+  $('modalCancel').addEventListener('click', () => { $('actionModal').style.display = 'none'; });
+
+  // Usuários
+  $('usersSearch').addEventListener('input', debounce(() => carregarUsuarios(), 250));
+  $('newUserBtn').addEventListener('click', () => abrirUserModal('create', null));
+  $('um-cancel').addEventListener('click', fecharUserModal);
+  $('um-save').addEventListener('click', salvarUserModal);
+  $('um-reset').addEventListener('click', resetarSenhaUsuario);
+  $('um-perfil').addEventListener('change', e => {
+    if(modoUserModal === 'create') aplicarDefaultsPorPerfil(e.target.value);
+  });
+  $('cp-save').addEventListener('click', salvarNovaSenha);
+  $('changePassModal').addEventListener('click', e => { if(e.target.id === 'changePassModal' && modoTrocaSenha === 'voluntario') $('changePassModal').style.display = 'none'; });
+
+  // Fechar dropdowns ao clicar fora
+  document.addEventListener('click', e => {
+    ['pf', 'pneus'].forEach(p => {
+      const wrap = $(p + '-busca-wrap');
+      const drop = $(p + '-dropdown');
+      if(wrap && drop && !wrap.contains(e.target)) drop.classList.remove('open');
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // USUÁRIOS
 // ═══════════════════════════════════════════════════════════════════════════
-let USUARIOS_CACHE = [];
 async function carregarUsuarios(){
-  if(!podeVerUsuarios()) return;
-  const upd = $('usersUpdateStatus'); upd.textContent = 'Carregando…';
-  const r = await apiOS('listarUsuarios');
-  if(!r.ok){ upd.textContent = 'Falha: ' + (r.error || 'desconhecido'); $('usersContent').innerHTML = '<div class="empty">Não foi possível carregar os usuários.</div>'; return; }
-  USUARIOS_CACHE = Array.isArray(r.usuarios) ? r.usuarios : [];
-  upd.textContent = 'Atualizado em ' + new Date().toLocaleTimeString('pt-BR');
-  renderUsuarios();
-}
-function renderUsuarios(){
+  const container = $('usersContent');
   const q = normalizeStr($('usersSearch').value);
-  const filtrados = USUARIOS_CACHE.filter(u => { if(!q) return true; return normalizeStr(u.usuario).includes(q) || normalizeStr(u.nome).includes(q); });
-  if(filtrados.length === 0){ $('usersContent').innerHTML = '<div class="empty">Nenhum usuário encontrado.</div>'; return; }
-  const podeCriar = temPermissao('usuarios_criar'); const podeEditar = temPermissao('usuarios_editar'); const podeResetar = temPermissao('usuarios_resetar');
-  const newBtn = $('newUserBtn'); if(newBtn) newBtn.style.display = podeCriar ? '' : 'none';
-  $('usersContent').innerHTML = filtrados.map(u => {
-    const ativo = normalizeStr(u.ativo) === 'sim'; const perms = u.permissoes || {};
-    const permsHtml = PERMISSOES_LISTA.map(p => { const on = perms[p.key] === true; return `<span class="perm-tag ${on?'on':''}">${on?'✓':'✕'} ${escapeHtml(p.label)}</span>`; }).join('');
-    const classes = ['user-card']; classes.push(u.perfil === 'admin' ? 'admin' : 'view'); if(!ativo) classes.push('inativo');
-    const badges = [`<span class="user-badge ${u.perfil}">${u.perfil === 'admin' ? 'ADMIN' : 'VISUALIZAÇÃO'}</span>`,`<span class="user-badge ${ativo?'ativo':'inativo'}">${ativo ? 'ATIVO' : 'INATIVO'}</span>`];
-    if(u.primeiroAcesso) badges.push(`<span class="user-badge primeiro">1º ACESSO PENDENTE</span>`);
-    if(u.usuario === ROOT_LOGIN) badges.push(`<span class="user-badge admin">ROOT</span>`);
-    const acoes = [];
-    if(podeEditar) acoes.push(`<button class="btn ghost" data-action="editar" data-user="${escapeAttr(u.usuario)}">Editar</button>`);
-    if(podeEditar) acoes.push(`<button class="btn ghost" data-action="toggleAtivo" data-user="${escapeAttr(u.usuario)}" data-ativo="${ativo?'sim':'nao'}">${ativo ? 'Desativar' : 'Ativar'}</button>`);
-    if(podeResetar) acoes.push(`<button class="btn ghost danger" data-action="resetar" data-user="${escapeAttr(u.usuario)}">Resetar senha</button>`);
-    return `<div class="${classes.join(' ')}" data-user="${escapeAttr(u.usuario)}"><div class="user-card-head"><div><div class="user-card-name">${escapeHtml(u.nome || u.usuario)}</div><div class="user-card-login">@${escapeHtml(u.usuario)}</div></div><div class="user-badges">${badges.join('')}</div></div><div class="user-perms">${permsHtml}</div><div class="user-meta">Criado em: ${escapeHtml(u.criadoEm || '—')}</div>${u.usuario === ROOT_LOGIN || acoes.length === 0 ? '' : `<div class="user-actions">${acoes.join('')}</div>`}</div>`;
-  }).join('');
-  document.querySelectorAll('#view-usuarios [data-action="editar"]').forEach(b => { b.addEventListener('click', () => { const u = USUARIOS_CACHE.find(x => x.usuario === b.dataset.user); if(u) abrirUserModal('edit', u); }); });
-  document.querySelectorAll('#view-usuarios [data-action="toggleAtivo"]').forEach(b => {
-    b.addEventListener('click', async () => {
-      const user = b.dataset.user; const ativoAtual = b.dataset.ativo === 'sim'; const novoAtivo = ativoAtual ? 'nao' : 'sim';
-      if(!confirm(`Confirma ${ativoAtual?'desativar':'ativar'} o usuário "${user}"?`)) return;
-      const r = await apiOS('atualizarUsuario', { usuarioAlvo:user, ativo:novoAtivo });
-      if(!r.ok){ alert('Erro: ' + r.error); return; } await carregarUsuarios();
+  container.innerHTML = '<div class="skel skel-text" style="grid-column:1/-1;"></div>';
+  try{
+    const r = await apiOS('listarUsuarios');
+    if(!r.ok){ container.innerHTML = '<div class="empty">Erro: ' + escapeHtml(r.error || 'desconhecido') + '</div>'; return; }
+    let users = Array.isArray(r.usuarios) ? r.usuarios : [];
+    if(q) users = users.filter(u => normalizeStr(u.nome).includes(q) || normalizeStr(u.usuario).includes(q));
+    if(users.length === 0){ container.innerHTML = '<div class="empty">Nenhum usuário encontrado.</div>'; return; }
+    $('usersUpdateStatus').textContent = 'Carregados ' + users.length + ' usuário(s)';
+    container.innerHTML = users.map(u => {
+      const perms = u.permissoes || {};
+      const permTags = PERMISSOES_LISTA.map(p => `<span class="perm-tag ${perms[p.key]?'on':''}">${escapeHtml(p.label)}</span>`).join('');
+      return `<div class="user-card ${u.perfil}">
+        <div class="user-card-head">
+          <div>
+            <div class="user-card-name">${escapeHtml(u.nome || '—')}</div>
+            <div class="user-card-login">@${escapeHtml(u.usuario || '—')}</div>
+          </div>
+          <div class="user-badges">
+            <span class="user-badge ${u.perfil}">${u.perfil === 'admin' ? 'Admin' : 'View'}</span>
+            <span class="user-badge ${u.ativo !== false ? 'ativo' : 'inativo'}">${u.ativo !== false ? 'Ativo' : 'Inativo'}</span>
+          </div>
+        </div>
+        <div class="user-perms">${permTags}</div>
+        <div class="user-actions">
+          <button class="btn ghost" data-user-edit="${escapeAttr(u.usuario)}">Editar</button>
+        </div>
+      </div>`;
+    }).join('');
+    container.querySelectorAll('[data-user-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const u = users.find(x => x.usuario === btn.dataset.userEdit);
+        if(u) abrirUserModal('edit', u);
+      });
     });
-  });
-  document.querySelectorAll('#view-usuarios [data-action="resetar"]').forEach(b => {
-    b.addEventListener('click', async () => {
-      const user = b.dataset.user; if(!confirm(`Resetar a senha de "${user}" para a padrão?`)) return;
-      const r = await apiOS('resetarSenha', { usuarioAlvo:user });
-      if(!r.ok){ alert('Erro: ' + r.error); return; } alert('Senha resetada.'); await carregarUsuarios();
-    });
-  });
+  }catch(e){ container.innerHTML = '<div class="empty">Erro de rede.</div>'; }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// POLLING + VISIBILITY
+// STARTUP
 // ═══════════════════════════════════════════════════════════════════════════
-let _pollHandle = null;
-function iniciarPolling(){
-  if(_pollHandle) clearInterval(_pollHandle);
-  _pollHandle = setInterval(async () => {
-    if(document.hidden) return;
-    const modalOpen = ['editModal','reportModal','manutReportModal','prevReportModal','actionModal','userModal','changePassModal','sucessoModal','multiProcessosModal','forcarConversaoModal'].some(id => { const el = $(id); return el && el.style.display === 'flex'; });
-    const selFocused = document.activeElement && ['SELECT','INPUT','TEXTAREA'].includes(document.activeElement.tagName);
-    if(modalOpen || selFocused) return;
-    if(activeView === 'os' && temPermissao('ver_os')) await loadDataOS();
-    if(activeView === 'viaturas' && temPermissao('ver_viaturas')) await loadDataViaturas();
-    if(activeView === 'manutencao' && temPermissao('ver_manutencao')) await loadDataManut();
-    if(activeView === 'preventiva' && temPermissao('ver_preventiva') && PREV_TAB_ATUAL === 'painel') await loadDataPreventiva();
-  }, POLLING_INTERVAL);
-}
-document.addEventListener('visibilitychange', () => {
-  if(document.hidden) return;
-  if(activeView === 'os' && temPermissao('ver_os')) loadDataOS();
-  if(activeView === 'viaturas' && temPermissao('ver_viaturas')) loadDataViaturas();
-  if(activeView === 'manutencao' && temPermissao('ver_manutencao')) loadDataManut();
-  if(activeView === 'preventiva' && temPermissao('ver_preventiva')) loadDataPreventiva();
-});
-if(IS_IOS){
-  document.addEventListener('focusin', e => {
-    if(e.target.matches('input, select, textarea')){
-      setTimeout(() => {
-        try{ e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }); }catch(err){}
-      }, 350);
-    }
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// LISTENERS
-// ═══════════════════════════════════════════════════════════════════════════
-$('menuToggle').addEventListener('click', () => {
-  const app = $('app');
-  if(isMobile()){ app.classList.toggle('sidebar-open'); }
-  else { app.classList.toggle('sidebar-collapsed'); try{ localStorage.setItem('deman_sidebar_collapsed', app.classList.contains('sidebar-collapsed') ? '1' : '0'); }catch(e){} }
-});
-$('sidebarBackdrop').addEventListener('click', () => $('app').classList.remove('sidebar-open'));
-document.querySelectorAll('.sidebar-link[data-view]').forEach(btn => {
-  if(btn.id === 'sidebarMovParent') return;
-  if(btn.id === 'sidebarPrevParent') return;
-  btn.addEventListener('click', () => showView(btn.dataset.view));
-});
-$('sidebarPrevParent').addEventListener('click', () => {
-  if(activeView !== 'preventiva'){ showView('preventiva'); setSidebarPrevExpanded(true); }
-  else { var sub = $('sidebarSubPrev'); setSidebarPrevExpanded(!(sub && sub.classList.contains('open'))); }
-});
-document.querySelectorAll('#sidebarSubPrev .sidebar-sublink').forEach(btn => {
-  btn.addEventListener('click', (e) => { e.stopPropagation(); showView('preventiva'); showPrevTab(btn.dataset.prevTab); });
-});
-$('sidebarMovParent').addEventListener('click', () => { if(activeView !== 'manutencao'){ showView('manutencao'); setSidebarMovExpanded(true); } else { setSidebarMovExpanded(!sidebarMovExpanded); } });
-document.querySelectorAll('#sidebarSubMov .sidebar-sublink').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); showView('manutencao'); if(btn.dataset.manutTab === 'novo'){ limparFormManut(); } showManutTab(btn.dataset.manutTab); }); });
-$('logoutBtn').addEventListener('click', handleLogout);
-$('loginBtn').addEventListener('click', handleLogin);
-$('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
-$('loginUser').addEventListener('keydown', e => { if(e.key==='Enter') $('loginPass').focus(); });
-$('cp-save').addEventListener('click', salvarNovaSenha);
-$('cp-confirm').addEventListener('keydown', e => { if(e.key==='Enter') salvarNovaSenha(); });
-$('um-cancel').addEventListener('click', fecharUserModal);
-$('um-save').addEventListener('click', salvarUserModal);
-$('um-reset').addEventListener('click', resetarSenhaUsuario);
-$('um-perfil').addEventListener('change', () => aplicarDefaultsPorPerfil($('um-perfil').value));
-$('userModal').addEventListener('click', e => { if(e.target.id === 'userModal') fecharUserModal(); });
-$('newUserBtn').addEventListener('click', () => { if(!temPermissao('usuarios_criar')){ alert('Sem permissão.'); return; } abrirUserModal('create'); });
-$('usersSearch').addEventListener('input', debounce(renderUsuarios, 180));
-
-const afStageSel = $('af-stage'); afStageSel.innerHTML = STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
-$('osSearch').addEventListener('input', debounce(() => renderOS(), 180));
-$('clearFilterBtn').addEventListener('click', () => { activeStatusFilter = null; renderOS(); });
-$('addBtn').addEventListener('click', () => { if(!temPermissao('os_criar')){ alert('Sem permissão.'); return; } $('addForm').classList.toggle('open'); });
-$('af-cancel').addEventListener('click', () => $('addForm').classList.remove('open'));
-$('af-save').addEventListener('click', async () => {
-  if(!temPermissao('os_criar')){ alert('Sem permissão.'); return; }
-  const v = normalizeViatura($('af-v').value); const os = $('af-os').value.trim();
-  const catLabel = $('af-cat').value.trim() || 'Outras'; const empresa = $('af-empresa').value.trim();
-  const stage = $('af-stage').value; const orcada = $('af-orcada').value; const qntRaw = $('af-qnt').value.trim(); const note = $('af-note').value.trim();
-  if(!v || !os){ alert('Preencha a viatura e o número da OS.'); return; }
-  let orcamentos = 0;
-  if(orcada === 'Sim'){ orcamentos = parseInt(qntRaw,10); if(isNaN(orcamentos) || orcamentos < 1) orcamentos = 1; if(orcamentos > 5) orcamentos = 5; }
-  const distribuida = (orcada === 'Sim') ? $('af-distribuida').value : '';
-  let qtdDist = '';
-  if(distribuida === 'Sim'){ const qd = parseInt($('af-qtd-dist').value.trim(), 10); if(!isNaN(qd) && qd > 0) qtdDist = String(qd); }
-  if(OS_DATA.some(r => String(r.os).trim().toLowerCase() === os.toLowerCase())){ alert(`Já existe uma OS com o número ${os}.`); return; }
-  const newRecord = { id:'r'+Date.now(), v, os, category:catLabel, catKey:slugify(catLabel), stage, orcamentos, distribuida, qtdDist, tabela:false, justificativa:false, empresa, note, alteradoPor:'', ultimaAlt:'' };
-  OS_DATA.push(newRecord); renderOS();
-  const ok = await createOSInSheet({ categoria:catLabel, viatura:v, os, status:stage, orcada, qnt:orcamentos>0?String(orcamentos):'', distribuida, qtdDist, oficina:empresa, observacoes:note });
-  if(!ok){ const idx = OS_DATA.indexOf(newRecord); if(idx > -1) OS_DATA.splice(idx,1); alert('A OS não pôde ser adicionada.'); }
-  else { ['af-v','af-os','af-cat','af-note','af-empresa','af-qnt','af-qtd-dist'].forEach(id => $(id).value = ''); $('af-orcada').value = 'Não'; $('af-distribuida').value = ''; $('addForm').classList.remove('open'); atualizarCascataOrcada('af'); }
-  renderOS();
-});
-$('csvFileInput').addEventListener('change', e => {
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => { processCsvText(ev.target.result); $('errorArea').style.display='none'; renderOS(); };
-  reader.readAsText(file);
-});
-$('ed-cancel').addEventListener('click', closeEditModal);
-$('editModal').addEventListener('click', e => { if(e.target.id === 'editModal') closeEditModal(); });
-$('ed-save').addEventListener('click', async () => {
-  if(!temPermissao('os_editar')){ alert('Sem permissão.'); return; }
-  const rec = OS_DATA.find(r => r.id === editingRecordId); if(!rec){ closeEditModal(); return; }
-  const newV = normalizeViatura($('ed-v').value); const newOs = $('ed-os').value.trim();
-  const newCat = $('ed-cat').value.trim() || 'Outras'; const newEmpresa = $('ed-empresa').value.trim();
-  const newStage = $('ed-stage').value; const newOrcada = $('ed-orcada').value;
-  const newQntRaw = $('ed-qnt').value.trim(); const newNote = $('ed-note').value.trim();
-  if(!newV || !newOs){ alert('Preencha a viatura e o número da OS.'); return; }
-  let newOrcamentos = 0;
-  if(newOrcada === 'Sim'){ newOrcamentos = parseInt(newQntRaw, 10); if(isNaN(newOrcamentos) || newOrcamentos < 1) newOrcamentos = 1; if(newOrcamentos > 5) newOrcamentos = 5; }
-  const newDistribuida = (newOrcada === 'Sim') ? ($('ed-distribuida').value || '') : '';
-  let newQtdDist = '';
-  if(newDistribuida === 'Sim'){ const qd = parseInt($('ed-qtd-dist').value.trim(), 10); if(!isNaN(qd) && qd > 0) newQtdDist = String(qd); }
-  const backup = { v:rec.v, os:rec.os, category:rec.category, catKey:rec.catKey, empresa:rec.empresa, stage:rec.stage, orcamentos:rec.orcamentos, distribuida:rec.distribuida, qtdDist:rec.qtdDist, note:rec.note };
-  const originalOs = rec.os; const originalViatura = rec.v;
-  rec.v = newV; rec.os = newOs; rec.category = newCat; rec.catKey = slugify(newCat);
-  rec.empresa = newEmpresa; rec.stage = newStage; rec.orcamentos = newOrcamentos; rec.note = newNote;
-  rec.distribuida = newDistribuida; rec.qtdDist = newQtdDist;
-  closeEditModal(); renderOS();
-  const ok = await editOSInSheet(originalOs, originalViatura, { viatura:newV, os:newOs, categoria:newCat, oficina:newEmpresa, status:newStage, orcada:newOrcada, qnt:newOrcamentos>0?String(newOrcamentos):'', distribuida:newDistribuida, qtdDist:newQtdDist, observacoes:newNote });
-  if(!ok){ Object.assign(rec, backup); alert('A edição não pôde ser salva. Revertida.'); renderOS(); }
-});
-$('reportBtn').addEventListener('click', () => { if(!temPermissao('os_relatorio')){ alert('Sem permissão.'); return; } abrirRelatorioOS(); });
-$('reportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioOS()));
-$('reportClose').addEventListener('click', () => _fecharReportModal('reportModal'));
-$('reportModal').addEventListener('click', e => { if(e.target.id === 'reportModal') _fecharReportModal('reportModal'); });
-
-$('viatSearch').addEventListener('input', debounce(() => renderViaturas(), 180));
-$('viatClearFilterBtn').addEventListener('click', () => { activeFilter = 'todas'; renderViaturas(); });
-$('prevSearch').addEventListener('input', debounce(renderPreventiva, 180));
-$('prevFiltroSituacao').addEventListener('change', e => { PREV_FILTRO_SITUACAO = e.target.value; renderPreventiva(); });
-$('prevFiltroOleo').addEventListener('change', e => { PREV_FILTRO_OLEO = e.target.value; renderPreventiva(); });
-$('prevClearFilterBtn').addEventListener('click', () => {
-  PREV_FILTRO_SITUACAO = ''; PREV_FILTRO_OLEO = '';
-  $('prevFiltroSituacao').value = ''; $('prevFiltroOleo').value = ''; $('prevSearch').value = '';
-  renderPreventiva();
-});
-$('prevReportBtn').addEventListener('click', () => { if(!temPermissao('ver_preventiva')){ alert('Sem permissão.'); return; } abrirRelatorioPreventiva(); });
-$('prevReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioPreventiva()));
-$('prevReportClose').addEventListener('click', () => _fecharReportModal('prevReportModal'));
-$('prevReportModal').addEventListener('click', e => { if(e.target.id === 'prevReportModal') _fecharReportModal('prevReportModal'); });
-
-$('multiProcessosClose').addEventListener('click', () => $('multiProcessosModal').style.display = 'none');
-$('multiProcessosModal').addEventListener('click', e => { if(e.target.id === 'multiProcessosModal') $('multiProcessosModal').style.display = 'none'; });
-
-$('forcarConversaoCancelar').addEventListener('click', () => { $('forcarConversaoModal').style.display = 'none'; _conversaoPendenteId = null; });
-$('forcarConversaoModal').addEventListener('click', e => { if(e.target.id === 'forcarConversaoModal'){ $('forcarConversaoModal').style.display = 'none'; _conversaoPendenteId = null; } });
-$('forcarConversaoCriarParalelo').addEventListener('click', async () => {
-  if(!_conversaoPendenteId) return;
-  const btn = $('forcarConversaoCriarParalelo');
-  btn.disabled = true; btn.textContent = 'Convertendo…';
-  const r = await apiManut('forcarConversaoAgendamento', { idAgendamento: _conversaoPendenteId, paralelo: true });
-  btn.disabled = false; btn.textContent = 'Criar em paralelo mesmo assim';
-  if(!r.ok){ $('forcarConversaoErro').textContent = r.error || 'Erro'; $('forcarConversaoErro').style.display = 'block'; return; }
-  const idAntigo = _conversaoPendenteId;
-  $('forcarConversaoModal').style.display = 'none';
-  _conversaoPendenteId = null;
-  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-  await loadDataManut();
-  mostrarSucesso({
-    titulo: 'Agendamento convertido!',
-    sub: 'Novo processo: ' + r.idNovo + ' (paralelo)',
-    resumo: [['ID agendamento', idAntigo], ['Novo processo Viatura', r.idNovo]],
-    mensagemWhats: ''
-  });
-});
-
-$('pf-busca').addEventListener('input', debounce(_handlePfBuscaInput, 120));
-$('pf-busca').addEventListener('focus', () => { if($('pf-busca').value.trim()) renderDropdownViaturas(); });
-$('pf-km').addEventListener('input', atualizarDicaKm);
-$('pf-cancel').addEventListener('click', () => { limparFormularioPreventiva(); showPrevTab('painel'); });
-$('pf-save').addEventListener('click', salvarPreventivaForm);
-document.addEventListener('click', e => {
-  const wrap = $('pf-busca-wrap'); if(!wrap) return;
-  if(!wrap.contains(e.target)) fecharDropdownViaturas();
-});
-
-$('manutSearch').addEventListener('input', debounce(renderManut, 180));
-$('manutClearFilterBtn').addEventListener('click', () => { MANUT_FILTRO_STATUS = 'abertos'; MANUT_FILTRO_TIPO = ''; $('manutFiltroTipo').value = ''; renderManut(); });
-$('manutFiltroTipo').addEventListener('change', e => { MANUT_FILTRO_TIPO = e.target.value; renderManut(); });
-$('mm-tipo').addEventListener('change', atualizarFormPorTipo);
-$('mm-save').addEventListener('click', salvarManut);
-$('mm-cancel').addEventListener('click', cancelarFormManut);
-$('mm-status').addEventListener('change', () => trocarCampoLocal('mm-local-wrap','mm-status',false));
-$('me-status').addEventListener('change', () => trocarCampoLocal('me-local-wrap','me-status',true, processoAtual ? processoAtual.tipo : undefined));
-$('mf-status').addEventListener('change', () => montarCampoLocalFinal());
-$('manutReportBtn').addEventListener('click', () => { if(!temPermissao('ver_manutencao')){ alert('Sem permissão.'); return; } abrirRelatorioManut(); });
-$('manutReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioManut()));
-$('manutReportClose').addEventListener('click', () => _fecharReportModal('manutReportModal'));
-$('manutReportModal').addEventListener('click', e => { if(e.target.id === 'manutReportModal') _fecharReportModal('manutReportModal'); });
-const selStatusManutRep = $('manutReportStatus');
-if(selStatusManutRep){ selStatusManutRep.addEventListener('change', () => { manutRepStatusFiltro = selStatusManutRep.value; renderRelatorioManut(); }); }
-const selModeManutRep = $('manutReportMode');
-if(selModeManutRep){ selModeManutRep.addEventListener('change', () => renderRelatorioManut()); }
-const selMesManutRep = $('manutReportMonth');
-if(selMesManutRep){ selMesManutRep.addEventListener('change', () => renderRelatorioManut()); }
-$('sucessoVoltar').addEventListener('click', fecharSucesso);
-$('sucessoWhats').addEventListener('click', () => { if(_sucessoMensagemWhats) abrirWhatsApp(_sucessoMensagemWhats); });
-$('sucessoModal').addEventListener('click', e => { if(e.target.id === 'sucessoModal') fecharSucesso(); });
-
-document.addEventListener('keydown', e => {
-  if(e.key !== 'Escape') return;
-  if($('pf-dropdown') && $('pf-dropdown').classList.contains('open')){ fecharDropdownViaturas(); return; }
-  ['editModal','reportModal','manutReportModal','prevReportModal','actionModal','userModal','multiProcessosModal','forcarConversaoModal'].forEach(id => {
-    const el = $(id);
-    if(!el || el.style.display !== 'flex') return;
-    if(id === 'reportModal' || id === 'manutReportModal' || id === 'prevReportModal') _fecharReportModal(id);
-    else if(id === 'forcarConversaoModal'){ el.style.display = 'none'; _conversaoPendenteId = null; }
-    else el.style.display = 'none';
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════
-// START APP
-// ═══════════════════════════════════════════════════════════════════════════
-function startApp(){
-  hideLogin(); $('app').classList.add('is-ready'); syncInternetTime();
-  currentUser = sessionStorage.getItem('deman_user_nome') || '';
-  currentPerfil = sessionStorage.getItem('deman_user_perfil') || 'view';
-  currentLogin = sessionStorage.getItem('deman_user_login') || '';
-  try{ currentPermissoes = JSON.parse(sessionStorage.getItem('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
+async function startApp(){
+  hideLogin();
+  $('app').classList.add('is-ready');
   $('currentUserName').textContent = currentUser || '—';
-  const perfilEl = $('currentUserPerfil');
-  if(perfilEl){ perfilEl.textContent = isAdmin() ? 'ADMIN' : 'VISUALIZAÇÃO'; perfilEl.className = 'badge-perfil ' + (isAdmin() ? 'admin' : 'view'); perfilEl.style.display = 'inline-block'; }
-  try{ if(localStorage.getItem('deman_sidebar_collapsed') === '1' && !isMobile()) $('app').classList.add('sidebar-collapsed'); }catch(e){}
-  renderPermissoesNoModal(); aplicarPermissoesUI();
-  limparFormManut();
-  if(carregarCache() && temPermissao('ver_viaturas')){ renderViaturas(); }
-  if(temPermissao('ver_os')) loadDataOS();
+  const badge = $('currentUserPerfil');
+  badge.textContent = currentPerfil === 'admin' ? 'ADMIN' : 'VIEW';
+  badge.className = 'badge-perfil ' + (currentPerfil === 'admin' ? 'admin' : 'view');
+  badge.style.display = '';
+  aplicarPermissoesUI();
+  bindTudo();
+  await syncInternetTime();
+  // Carrega dados iniciais em paralelo
+  loadDataOS();
   if(temPermissao('ver_viaturas')) loadDataViaturas();
   if(temPermissao('ver_manutencao')) loadDataManut();
-  if(temPermissao('ver_preventiva')){
-    loadDataPreventiva();
-    if(temPermissao('prev_editar_km')) loadListaCompletaPreventiva();
-  }
+  if(temPermissao('ver_preventiva')) loadDataPreventiva();
+  // Tela inicial
   showView('home');
-  iniciarPolling();
+  // Polling
+  setInterval(() => {
+    if(document.hidden || !isLoggedIn()) return;
+    if(temPermissao('ver_os')) loadDataOS();
+    if(temPermissao('ver_viaturas')) loadDataViaturas();
+    if(temPermissao('ver_manutencao')) loadDataManut();
+    if(temPermissao('ver_preventiva')) loadDataPreventiva();
+  }, POLLING_INTERVAL);
 }
 
-function setFormModo(modo){
-  modoManutForm = modo;
-  $('formCriar').style.display = (modo === 'criar') ? '' : 'none';
-  $('formEvento').style.display = (modo === 'evento') ? '' : 'none';
-  $('formFinalizar').style.display = (modo === 'finalizar') ? '' : 'none';
-  if(modo === 'criar'){
-    $('manutFormTitle').textContent = '🛠 Nova entrada';
-    $('manutFormHelp').innerHTML = 'Escolha o tipo (Viatura, Outro ou Agendamento) e preencha os dados.';
-    $('procInfoBox').style.display = 'none';
-    $('mm-delete').style.display = 'none';
-    $('mm-save').textContent = 'Criar processo';
-  } else if(modo === 'evento'){
-    $('manutFormTitle').textContent = '📝 Adicionar evento';
-    $('manutFormHelp').innerHTML = 'Adicione uma movimentação ou observação a este processo.';
-    $('mm-delete').style.display = 'none';
-    $('mm-save').textContent = 'Salvar evento';
-  } else if(modo === 'finalizar'){
-    $('manutFormTitle').textContent = '✅ Finalizar processo';
-    $('manutFormHelp').innerHTML = 'Ao finalizar, o processo é encerrado.';
-    $('mm-delete').style.display = 'none';
-    $('mm-save').textContent = 'Finalizar';
-  }
-}
-
-function atualizarFormPorTipo(){
-  const tipo = $('mm-tipo').value;
-  const lblV = $('mm-viatura-label');
-  const inpV = $('mm-viatura');
-  const wrapLocal = $('mm-local-wrap');
-  const lblStatus = $('mm-status-label');
-  const lblEntrada = $('mm-entrada-label');
-  const lblDataAg = $('mm-data-ag-label');
-  const lblHoraAg = $('mm-hora-ag-label');
-
-  if(!tipo){
-    if(lblV) lblV.childNodes[0].nodeValue = 'Viatura';
-    if(inpV) inpV.placeholder = 'ex: ABT-17';
-    if(lblStatus) lblStatus.style.display = '';
-    if(lblEntrada) lblEntrada.style.display = '';
-    if(lblDataAg) lblDataAg.style.display = 'none';
-    if(lblHoraAg) lblHoraAg.style.display = 'none';
-    return;
-  }
-
-  if(tipo === TIPO_AGENDAMENTO){
-    if(lblV) lblV.childNodes[0].nodeValue = 'Viatura';
-    if(inpV) inpV.placeholder = 'ex: ABT-17';
-    if(lblStatus) lblStatus.style.display = 'none';
-    if(lblEntrada) lblEntrada.style.display = 'none';
-    if(lblDataAg) lblDataAg.style.display = '';
-    if(lblHoraAg) lblHoraAg.style.display = '';
-    wrapLocal.innerHTML = _htmlInputLocal('mm-local', lerLocalForm('mm-local-wrap'));
-    const dt = new Date(); dt.setDate(dt.getDate() + 7);
-    const pad = n => String(n).padStart(2,'0');
-    $('mm-data-ag').value = dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate());
-    if(!$('mm-hora-ag').value) $('mm-hora-ag').value = '08:00';
-    return;
-  }
-
-  if(lblDataAg) lblDataAg.style.display = 'none';
-  if(lblHoraAg) lblHoraAg.style.display = 'none';
-  if(lblStatus) lblStatus.style.display = '';
-  if(lblEntrada) lblEntrada.style.display = '';
-
-  if(tipo === TIPO_OUTRO){
-    if(lblV) lblV.childNodes[0].nodeValue = 'Descrição do item';
-    if(inpV) inpV.placeholder = 'ex: Cilindro de ar, Bomba, Peça X…';
-    montarCampoLocal('mm-local-wrap', lerLocalForm('mm-local-wrap'), $('mm-status').value, false, TIPO_OUTRO);
+function init(){
+  if(isLoggedIn()){
+    currentLogin = sessionStorage.getItem('deman_user_login') || '';
+    currentUser = sessionStorage.getItem('deman_user_nome') || '';
+    currentPerfil = sessionStorage.getItem('deman_user_perfil') || 'view';
+    try{ currentPermissoes = JSON.parse(sessionStorage.getItem('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
+    startApp();
   } else {
-    if(lblV) lblV.childNodes[0].nodeValue = 'Viatura';
-    if(inpV) inpV.placeholder = 'ex: ABT-17';
-    montarCampoLocal('mm-local-wrap', lerLocalForm('mm-local-wrap'), $('mm-status').value, false);
+    showLogin();
   }
 }
 
-async function salvarCriarManut(){
-  const err = $('mm-error'); const btn = $('mm-save'); err.style.display = 'none'; err.textContent = '';
-  const tipo       = $('mm-tipo').value;
-  const viatura    = $('mm-viatura').value.trim().toUpperCase();
-  const local      = lerLocalForm('mm-local-wrap');
-  const solicitante= $('mm-solicitante').value.trim();
-  const informante = $('mm-informante').value.trim();
-  const detalhes   = $('mm-detalhes').value.trim();
-
-  if(!tipo){ err.textContent = 'Selecione o tipo.'; err.style.display='block'; return; }
-  if(!viatura){ err.textContent = tipo === TIPO_OUTRO ? 'Informe a descrição.' : 'Informe a viatura.'; err.style.display='block'; return; }
-  if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
-
-  let payload = { tipo, viatura, local, solicitante, informante, detalhes };
-
-  if(tipo === TIPO_AGENDAMENTO){
-    const dataAg = $('mm-data-ag').value;
-    const horaAg = $('mm-hora-ag').value || '08:00';
-    if(!dataAg){ err.textContent = 'Informe a data agendada.'; err.style.display='block'; return; }
-    payload.dataAgendada = dataAg;
-    payload.horaAgendada = horaAg;
-  } else {
-    const status  = $('mm-status').value;
-    const entrada = $('mm-entrada').value;
-    if(!entrada){ err.textContent = 'Informe a data de entrada.'; err.style.display='block'; return; }
-    payload.status = status;
-    payload.entrada = entrada;
-  }
-
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  let r;
-  try {
-    r = await apiManut('criarProcesso', payload);
-  } catch(e){
-    err.textContent = 'Erro inesperado: ' + (e.message || e);
-    err.style.display = 'block';
-    return;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Criar processo';
-  }
-  if(!r || !r.ok){
-    err.textContent = (r && r.error) || 'Erro ao salvar.';
-    err.style.display = 'block';
-    return;
-  }
-
-  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-  await loadDataManut();
-
-  const grupos = agruparPorProcesso();
-  const procCriado = grupos[r.id];
-
-  if(tipo === TIPO_AGENDAMENTO){
-    const dtAg = parseDataManut(payload.dataAgendada + ' ' + payload.horaAgendada);
-    const dtAgStr = dtAg ? dtAg.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : (payload.dataAgendada + ' ' + payload.horaAgendada);
-    mostrarSucesso({
-      titulo: 'Agendamento criado!',
-      sub: 'ID: ' + r.id + ' · ' + dtAgStr,
-      resumo: [
-        ['Tipo', TIPO_AGENDAMENTO],
-        ['ID', r.id],
-        ['Viatura', viatura],
-        ['Data/hora agendada', dtAgStr],
-        ['Local', local || '—'],
-        ['Informante', informante]
-      ],
-      mensagemWhats: ''
-    });
-  } else {
-    const resumo = [
-      ['Tipo', tipo], ['ID', r.id],
-      [tipo === TIPO_OUTRO ? 'Item' : 'Viatura', viatura],
-      ['Status', statusLabelManut(payload.status)],
-      ['Local', local || '—'],
-      ['Entrada', payload.entrada]
-    ];
-    if(payload.processosAbertosAntes) resumo.push(['Paralelos', payload.processosAbertosAntes + ' processo(s) já aberto(s)']);
-    if(solicitante) resumo.push(['Solicitante', solicitante]);
-    resumo.push(['Informante', informante]);
-    const mensagem = procCriado ? montarMensagemEntrada(procCriado) : '';
-    mostrarSucesso({ titulo: 'Processo criado!', sub: 'ID: ' + r.id, resumo: resumo, mensagemWhats: mensagem });
-  }
-  limparFormManut();
-}
-
-function abrirFormEvento(p){
-  if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
-  processoAtual = p;
-  setFormModo('evento');
-  preencherProcInfoBox(p);
-  const tipoProc = p.tipo || TIPO_VIATURA;
-  if(tipoProc === TIPO_AGENDAMENTO){
-    $('me-tipo').value = 'Observação';
-    $('me-tipo').querySelector('option[value="Movimentação"]').disabled = true;
-  } else {
-    $('me-tipo').value = 'Movimentação';
-    $('me-tipo').querySelector('option[value="Movimentação"]').disabled = false;
-  }
-  $('me-data').value = agoraDatetimeLocal();
-  $('me-status').value = '';
-  montarCampoLocal('me-local-wrap', p.ultimo ? p.ultimo.local : '', $('me-status').value, true, tipoProc);
-  $('me-solicitante').value = p.solicitante || (p.entrada ? p.entrada.solicitante : '');
-  $('me-informante').value = '';
-  $('me-detalhes').value = '';
-  $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
-  showView('manutencao'); showManutTab('novo');
-}
-
-function limparFormManut(){
-  processoAtual = null;
-  setFormModo('criar');
-  $('mm-tipo').value = '';
-  $('mm-tipo').disabled = false;
-  $('mm-viatura').value = ''; $('mm-viatura').disabled = false;
-  $('mm-status').value = 'Em Manutenção'; $('mm-status').disabled = false;
-  $('mm-entrada').value = agoraDatetimeLocal(); $('mm-entrada').disabled = false;
-  $('mm-data-ag').value = ''; $('mm-hora-ag').value = '08:00';
-  montarCampoLocal('mm-local-wrap', '', $('mm-status').value, false);
-  atualizarFormPorTipo();
-  $('mm-solicitante').value = ''; $('mm-solicitante').disabled = false;
-  $('mm-informante').value = ''; $('mm-informante').disabled = false;
-  $('mm-detalhes').value = ''; $('mm-detalhes').disabled = false;
-
-  $('me-tipo').value = 'Movimentação';
-  $('me-data').value = agoraDatetimeLocal();
-  $('me-status').value = '';
-  montarCampoLocal('me-local-wrap', '', '', true);
-  $('me-solicitante').value = '';
-  $('me-informante').value = '';
-  $('me-detalhes').value = '';
-
-  $('mf-data').value = agoraDatetimeLocal();
-  $('mf-status').value = 'Ativa';
-  $('mf-local-wrap').innerHTML = '';
-  montarCampoLocalFinal();
-  $('mf-informante').value = '';
-  $('mf-detalhes').value = '';
-
-  $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
-  $('procInfoBox').style.display = 'none';
-}
-
-function preencherProcInfoBox(p){
-  const inf = p.entrada ? p.entrada.informante : '';
-  const det = p.entrada ? p.entrada.detalhes : '';
-  const tipo = p.tipo || TIPO_VIATURA;
-  const labelItem = tipo === TIPO_OUTRO ? 'Item' : 'Viatura';
-  const solicitante = p.solicitante || (p.entrada ? p.entrada.solicitante : '');
-  $('procInfoBox').innerHTML = `
-    <div class="row"><span>Tipo</span><b>${escapeHtml(tipo)}</b></div>
-    <div class="row"><span>Processo</span><b>${escapeHtml(p.id)}</b></div>
-    <div class="row"><span>${labelItem}</span><b>${escapeHtml(p.viatura)}</b></div>
-    <div class="row"><span>Entrada</span><b>${escapeHtml(p.entrada ? p.entrada.data : '—')}</b></div>
-    <div class="row"><span>Local</span><b>${escapeHtml(p.entrada ? p.entrada.local : '—')}</b></div>
-    ${solicitante ? `<div class="row"><span>Solicitante</span><b>${escapeHtml(solicitante)}</b></div>` : ''}
-    <div class="row"><span>Informante</span><b>${escapeHtml(inf || '—')}</b></div>
-    ${det ? `<div class="row"><span>Detalhes</span><b style="text-align:right;max-width:65%;">${escapeHtml(det)}</b></div>` : ''}
-  `;
-  $('procInfoBox').style.display = '';
-}
-
-function agoraDatetimeLocal(){
-  const agora = new Date(); const pad = n => String(n).padStart(2,'0');
-  return `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
-}
-
-function showManutTab(name){
-  if(name !== 'registros' && name !== 'novo') return;
-  if(name === 'novo' && !temPermissao('manut_criar')) name = 'registros';
-  activeManutTab = name;
-  document.querySelectorAll('#sidebarSubMov .sidebar-sublink').forEach(b => b.classList.toggle('active', b.dataset.manutTab === name));
-  $('manutPanel-registros').classList.toggle('active', name === 'registros');
-  $('manutPanel-novo').classList.toggle('active', name === 'novo');
-  setSidebarMovExpanded(true);
-  window.scrollTo(0, 0);
-  if(name === 'novo' && modoManutForm === 'criar') setTimeout(() => $('mm-tipo').focus({ preventScroll: true }), 60);
-}
-
-async function salvarManut(){
-  if(modoManutForm === 'criar') return salvarCriarManut();
-  if(modoManutForm === 'evento') return salvarEventoManut();
-  if(modoManutForm === 'finalizar') return salvarFinalizarManut();
-}
-
-async function salvarEventoManut(){
-  if(!processoAtual) return;
-  const err = $('mm-error'); const btn = $('mm-save'); err.style.display = 'none'; err.textContent = '';
-  const tipo       = $('me-tipo').value;
-  const data       = $('me-data').value;
-  const status     = $('me-status').value;
-  const local      = lerLocalForm('me-local-wrap');
-  const solicitante= $('me-solicitante').value.trim();
-  const informante = $('me-informante').value.trim();
-  const detalhes   = $('me-detalhes').value.trim();
-  if(!data){ err.textContent = 'Informe a data.'; err.style.display='block'; return; }
-  if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  const procId = processoAtual.id;
-  let r;
-  try {
-    r = await apiManut('adicionarEvento', { id: procId, tipo, data, status, local, solicitante, informante, detalhes });
-  } catch(e){
-    err.textContent = 'Erro inesperado: ' + (e.message || e);
-    err.style.display = 'block';
-    return;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Salvar evento';
-  }
-  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
-  _ultimoEventoAdicionado[procId] = Date.now();
-  _persistirDesfazer();
-  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-  await loadDataManut();
-  limparFormManut();
-  showManutTab('registros');
-  window.scrollTo(0, 0);
-}
-
-async function salvarFinalizarManut(){
-  if(!processoAtual) return;
-  const err = $('mm-error'); const btn = $('mm-save'); err.style.display = 'none'; err.textContent = '';
-  const dataFim     = $('mf-data').value;
-  const statusFinal = $('mf-status').value;
-  const local       = lerLocalForm('mf-local-wrap');
-  const informante  = $('mf-informante').value.trim();
-  const detalhes    = $('mf-detalhes').value.trim();
-  if(!dataFim){ err.textContent = 'Informe a data final.'; err.style.display='block'; return; }
-  if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
-  if(!detalhes){ if(!confirm('Sem descrição do que foi feito. Continuar mesmo assim?')) return; }
-  btn.disabled = true; btn.textContent = 'Salvando…';
-  const procId = processoAtual.id;
-  let r;
-  try {
-    r = await apiManut('finalizarProcesso', { id: procId, statusFinal, dataFim, local, informante, detalhes });
-  } catch(e){
-    err.textContent = 'Erro inesperado: ' + (e.message || e);
-    err.style.display = 'block';
-    return;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Finalizar';
-  }
-  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao finalizar.'; err.style.display = 'block'; return; }
-  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-  await loadDataManut();
-  const grupos = agruparPorProcesso();
-  const procAtualizado = grupos[procId];
-  const mensagem = procAtualizado ? montarMensagemFinalizacao(procAtualizado) : '';
-  const dataFimBR = dataFim.split('T')[0].split('-').reverse().join('/');
-  const dias = r.dias != null ? r.dias : 0;
-  const localFinal = r.localUsado || local || '—';
-  const outrosAbertos = Array.isArray(r.outrosAbertos) ? r.outrosAbertos : [];
-  const resumo = [
-    ['Tipo', processoAtual.tipo || TIPO_VIATURA],
-    ['ID', procId],
-    [(processoAtual.tipo === TIPO_OUTRO) ? 'Item' : 'Viatura', processoAtual.viatura],
-    ['Status final', statusLabelManut(statusFinal)],
-    ['Local', localFinal],
-    ['Saída', dataFimBR],
-    ['Dias', dias + 'd'],
-    ['Informante', informante]
-  ];
-  if(outrosAbertos.length > 0){
-    resumo.push(['⚠️ Atenção', outrosAbertos.length + ' outro(s) processo(s) aberto(s) para esta viatura']);
-  }
-  mostrarSucesso({ titulo: 'Processo finalizado!', sub: 'ID: ' + procId, resumo: resumo, mensagemWhats: mensagem });
-  limparFormManut();
-}
-
-function abrirFormFinalizar(p){
-  if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
-  if(p.tipo === TIPO_AGENDAMENTO){ alert('Agendamentos não podem ser finalizados manualmente. Eles convertem automaticamente ou via botão "Converter agora".'); return; }
-  processoAtual = p;
-  setFormModo('finalizar');
-  preencherProcInfoBox(p);
-  $('mf-data').value = agoraDatetimeLocal();
-  $('mf-status').value = 'Ativa';
-  $('mf-local-wrap').innerHTML = '';
-  montarCampoLocalFinal();
-  $('mf-informante').value = p.entrada ? p.entrada.informante : '';
-  $('mf-detalhes').value = '';
-  $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
-  showView('manutencao'); showManutTab('novo');
-}
-
-function cancelarFormManut(){
-  let temDados = false;
-  if(modoManutForm === 'criar'){
-    temDados = $('mm-tipo').value !== '' || $('mm-viatura').value.trim() !== '' || lerLocalForm('mm-local-wrap') !== '' || $('mm-solicitante').value.trim() !== '' || $('mm-informante').value.trim() !== '' || $('mm-detalhes').value.trim() !== '';
-  } else if(modoManutForm === 'evento'){
-    temDados = $('me-detalhes').value.trim() !== '' || $('me-informante').value.trim() !== '';
-  } else if(modoManutForm === 'finalizar'){
-    temDados = $('mf-detalhes').value.trim() !== '' || $('mf-informante').value.trim() !== '';
-  }
-  if(temDados && !confirm('Descartar o que foi digitado?')) return;
-  limparFormManut();
-  showManutTab('registros');
-  window.scrollTo(0, 0);
-}
-
-let _sucessoMensagemWhats = '';
-function mostrarSucesso({ titulo, sub, resumo, mensagemWhats }){
-  $('sucessoTitulo').textContent = titulo; $('sucessoSub').textContent = sub;
-  $('sucessoResumo').innerHTML = resumo.map(([k, v]) => `<div class="resumo-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
-  _sucessoMensagemWhats = mensagemWhats || '';
-  const btnWhats = $('sucessoWhats');
-  if(btnWhats) btnWhats.style.display = _sucessoMensagemWhats ? '' : 'none';
-  $('sucessoModal').style.display = 'flex';
-}
-function fecharSucesso(){
-  $('sucessoModal').style.display = 'none';
-  _sucessoMensagemWhats = '';
-  limparFormManut();
-  showManutTab('registros');
-  window.scrollTo(0, 0);
-}
-
-function abrirWhatsApp(texto) {
-  const textoCodificado = encodeURIComponent(texto);
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (isMobile) {
-    window.location.href = `whatsapp://send?text=${textoCodificado}`;
-  } else {
-    window.open(`https://web.whatsapp.com/send?text=${textoCodificado}`, '_blank');
-  }
-}
-function normalizarEventoParaMensagem(e){
-  return { tipo: e.evento || e.tipo || '', data: e.data || '', status: e.status || '', local: e.local || '', informante: e.informante || '', detalhes: e.detalhes || '', dias: e.dias || '' };
-}
-function normalizarProcessoParaMensagem(p){
-  if(!p) return { id:'', viatura:'', status:'', local:'', entrada:'', informanteEntrada:'', saida:'', informanteSaida:'', dias:'', detalhes:'', eventos:[], solicitante:'' };
-  if(Array.isArray(p.eventos) && p.eventos.length > 0){
-    const entrada = p.eventos.find(e => { const ev = normalizeStr(e.evento || e.tipo); return ev.indexOf('entrada') !== -1 || ev.indexOf('agend') !== -1; }) || p.eventos[0];
-    const finalizacao = p.eventos.find(e => normalizeStr(e.evento || e.tipo).indexOf('finaliz') !== -1) || null;
-    const ultimo = p.eventos[p.eventos.length - 1];
-    return {
-      id: p.id || '', viatura: p.viatura || '',
-      status: ultimo ? (ultimo.status || '') : '',
-      local: ultimo ? (ultimo.local || '') : '',
-      entrada: entrada ? (entrada.data || '') : '',
-      informanteEntrada: entrada ? (entrada.informante || '') : '',
-      solicitante: (p.solicitante || (entrada ? entrada.solicitante : '')) || '',
-      saida: finalizacao ? (finalizacao.data || '') : '',
-      informanteSaida: finalizacao ? (finalizacao.informante || '') : '',
-      dias: finalizacao ? (finalizacao.dias || '') : '',
-      detalhes: finalizacao ? (finalizacao.detalhes || '') : '',
-      eventos: p.eventos.map(normalizarEventoParaMensagem)
-    };
-  }
-  return { id: p.id || '', viatura: p.viatura || '', status: p.status || '', local: p.local || '', entrada: typeof p.entrada === 'string' ? p.entrada : '', informanteEntrada: p.informanteEntrada || '', solicitante: p.solicitante || '', saida: p.saida || '', informanteSaida: p.informanteSaida || '', dias: p.dias || '', detalhes: p.detalhes || '', eventos: Array.isArray(p.eventos) ? p.eventos.map(normalizarEventoParaMensagem) : [] };
-}
-function montarBlocoEvento(ev){
-  const linhas = [];
-  linhas.push(iconeEvento(ev.tipo) + ' *' + (ev.tipo || 'Evento') + '* · ' + (ev.data || '—'));
-  if(ev.status) linhas.push('Status: ' + statusLabelManut(ev.status));
-  if(ev.local) linhas.push('Local: ' + ev.local);
-  if(ev.informante) linhas.push('Informante: ' + ev.informante);
-  if(ev.detalhes) linhas.push('Descrição: ' + ev.detalhes);
-  return linhas.join('\n');
-}
-function montarMensagemEntrada(p){
-  const proc = normalizarProcessoParaMensagem(p);
-  const tipo = p.tipo || TIPO_VIATURA;
-  const labelItem = tipo === TIPO_OUTRO ? 'Item' : 'Viatura';
-  const linhas = [];
-  linhas.push(tipo === TIPO_AGENDAMENTO ? '📅 *AGENDAMENTO* · ' + proc.id : '🛠 *NOVA MOVIMENTAÇÃO* · ' + proc.id);
-  linhas.push('');
-  linhas.push('*Tipo:* ' + tipo);
-  linhas.push('*' + labelItem + ':* ' + proc.viatura);
-  linhas.push('*Status:* ' + statusLabelManut(proc.status));
-  linhas.push('*Local:* ' + (proc.local || '—'));
-  linhas.push('*Entrada:* ' + (proc.entrada || '—'));
-  if(proc.solicitante) linhas.push('*Solicitante:* ' + proc.solicitante);
-  if(proc.informanteEntrada) linhas.push('*Informante:* ' + proc.informanteEntrada);
-  proc.eventos.forEach(ev => { linhas.push(''); linhas.push(montarBlocoEvento(ev)); });
-  linhas.push('');
-  linhas.push('_Registrado por: ' + (currentUser || 'DEMAN') + '_');
-  linhas.push('_DEMAN · ' + new Date().toLocaleString('pt-BR') + '_');
-  return linhas.join('\n');
-}
-function montarMensagemFinalizacao(p){
-  const proc = normalizarProcessoParaMensagem(p);
-  const tipo = p.tipo || TIPO_VIATURA;
-  const labelItem = tipo === TIPO_OUTRO ? 'Item' : 'Viatura';
-  const linhas = [];
-  linhas.push('✅ *FINALIZAÇÃO DA MOVIMENTAÇÃO* · ' + proc.id);
-  linhas.push('');
-  linhas.push('*Tipo:* ' + tipo);
-  linhas.push('*' + labelItem + ':* ' + proc.viatura);
-  if(proc.solicitante) linhas.push('*Solicitante:* ' + proc.solicitante);
-  linhas.push('*Status final:* ' + statusLabelManut(proc.status));
-  linhas.push('*Local final:* ' + (proc.local || '—'));
-  linhas.push('*Entrada:* ' + (proc.entrada || '—'));
-  linhas.push('*Saída:* ' + (proc.saida || '—'));
-  linhas.push('*Dias:* ' + (proc.dias || '—'));
-  proc.eventos.forEach(ev => { linhas.push(''); linhas.push(montarBlocoEvento(ev)); });
-  linhas.push('');
-  linhas.push('_Registrado por: ' + (currentUser || 'DEMAN') + '_');
-  linhas.push('_DEMAN · ' + new Date().toLocaleString('pt-BR') + '_');
-  return linhas.join('\n');
-}
-
-if(isLoggedIn()){
-  currentLogin = sessionStorage.getItem('deman_user_login') || '';
-  currentUser = sessionStorage.getItem('deman_user_nome') || '';
-  currentPerfil = sessionStorage.getItem('deman_user_perfil') || 'view';
-  try{ currentPermissoes = JSON.parse(sessionStorage.getItem('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
-  startApp();
-} else { showLogin(); }
-bindPasswordToggles();
+document.addEventListener('DOMContentLoaded', () => {
+  bindPasswordToggles();
+  init();
+});
 </script>
 </body>
 </html>
+     
