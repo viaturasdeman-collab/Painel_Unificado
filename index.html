@@ -1374,7 +1374,7 @@ const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 if(IS_TOUCH) document.documentElement.classList.add('is-touch');
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Sincronização de Hora com a Internet (v6.7)
+// Sincronização de Hora
 // ═══════════════════════════════════════════════════════════════════════════
 let _serverTimeOffset = 0;
 
@@ -1477,9 +1477,6 @@ function _fecharReportModal(id){
   document.body.classList.remove('relatorio-aberto');
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Impressão com nome de arquivo personalizado + filtros ativos
-// ─────────────────────────────────────────────────────────────────────────
 function imprimirComTitulo(nomeBase){
   const seguro = String(nomeBase || 'Relatório')
     .replace(/[\\/:*?"<>|]/g, '-')
@@ -1505,9 +1502,6 @@ function imprimirComTitulo(nomeBase){
   setTimeout(() => window.print(), 50);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Nome dinâmico por relatório — lê os filtros ativos no momento do clique
-// ─────────────────────────────────────────────────────────────────────────
 function _nomeRelatorioOS(){
   const filtros = [];
 
@@ -3009,396 +3003,160 @@ function tentarConverterAgendamento(p){
     const r = await apiManut('forcarConversaoAgendamento', { idAgendamento: p.id, paralelo: false });
     if(r.ok){
       try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-            await loadDataManut();
+      await loadDataManut();
+      mostrarSucesso({
+        titulo: 'Agendamento convertido!',
+        sub: 'Novo processo: ' + r.idNovo,
+        resumo: [['ID agendamento', p.id], ['Novo processo Viatura', r.idNovo], ['Viatura', p.viatura]],
+        mensagemWhats: ''
+      });
       _conversaoPendenteId = null;
-    } else if(r.error && String(r.error).toLowerCase().indexOf('conflito') !== -1){
-      abrirModalForcarConversao(p, r.conflitos || []);
-    } else {
-      alert('Erro: ' + (r.error || 'desconhecido'));
-      _conversaoPendenteId = null;
+      return;
     }
+    if(r.requerConfirmacaoParalelo){
+      abrirModalForcarConversao(p, r.processosAbertos || []);
+      return;
+    }
+    alert('Erro: ' + (r.error || 'desconhecido'));
+    _conversaoPendenteId = null;
   })();
 }
 
-function abrirModalForcarConversao(p, conflitos){
-  $('forcarConversaoSub').textContent = 'A viatura ' + p.viatura + ' já possui processos abertos.';
-  $('forcarConversaoLista').innerHTML = (conflitos.length ? conflitos : [{ id:p.id, local:'—', entrada:'—' }]).map(c => `
-    <div style="background:var(--surface-2);border:1px solid var(--border);border-left:4px solid var(--amber);border-radius:8px;padding:10px 12px;">
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber);font-weight:600;margin-bottom:4px;">${escapeHtml(c.id)}</div>
-      <div style="font-size:12px;">📍 ${escapeHtml(c.local || '—')}</div>
-      <div style="font-size:10.5px;color:var(--text-faint);">Desde ${escapeHtml(c.entrada || '—')}</div>
-    </div>
-  `).join('');
+function abrirModalForcarConversao(p, processosAbertos){
+  const sub = $('forcarConversaoSub');
+  sub.innerHTML = 'A viatura <b>' + escapeHtml(p.viatura) + '</b> já tem ' + processosAbertos.length + ' processo(s) aberto(s).<br>Converter o agendamento vai gerar um <b>processo paralelo</b>.';
+  const lista = $('forcarConversaoLista');
+  lista.innerHTML = processosAbertos.map(a => `<div style="background:var(--surface-2);border:1px solid var(--border);border-left:4px solid var(--amber);border-radius:8px;padding:8px 12px;font-size:12px;">
+    <span style="font-family:'IBM Plex Mono',monospace;color:var(--amber);font-weight:600;">${escapeHtml(a.id)}</span>
+    · 📍 ${escapeHtml(a.ultimoLocal || a.entradaLocal || '—')}
+    · ${a.dias || 0}d
+  </div>`).join('');
   $('forcarConversaoErro').style.display = 'none';
   $('forcarConversaoModal').style.display = 'flex';
 }
 
-function abrirFormFinalizar(p){
-  if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
-  modoManutForm = 'finalizar';
-  processoAtual = p;
-  $('manutFormTitle').textContent = '✅ Finalizar processo';
-  $('manutFormHelp').textContent = 'Preencha os dados da saída da viatura.';
-  $('procInfoBox').style.display = 'block';
-  $('procInfoBox').innerHTML = `
-    <div class="row"><span>Viatura</span><b>${escapeHtml(p.viatura)}</b></div>
-    <div class="row"><span>ID do processo</span><b>${escapeHtml(p.id)}</b></div>
-    <div class="row"><span>Entrada</span><b>${escapeHtml(p.entrada ? p.entrada.data : '—')}</b></div>
-    <div class="row"><span>Local atual</span><b>${escapeHtml(p.ultimo && p.ultimo.local ? p.ultimo.local : '—')}</b></div>
-  `;
-  $('formCriar').style.display = 'none';
-  $('formEvento').style.display = 'none';
-  $('formFinalizar').style.display = 'grid';
-  const agora = new Date(getNowTime());
-  const pad = n => String(n).padStart(2,'0');
-  $('mf-data').value = `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
-  $('mf-status').value = 'Ativa';
-  $('mf-informante').value = '';
-  $('mf-detalhes').value = '';
-  montarCampoLocalFinal();
-  $('mm-delete').style.display = 'none';
-  $('mm-save').textContent = 'Finalizar';
-  $('mm-save').dataset.modo = 'finalizar';
-  $('mm-error').style.display = 'none';
-  showManutTab('novo');
-}
-
-function abrirFormEvento(p){
-  if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
-  modoManutForm = 'evento';
-  processoAtual = p;
-  $('manutFormTitle').textContent = '📝 Adicionar evento';
-  $('manutFormHelp').textContent = 'Registre uma movimentação ou observação no processo.';
-  $('procInfoBox').style.display = 'block';
-  $('procInfoBox').innerHTML = `
-    <div class="row"><span>Viatura</span><b>${escapeHtml(p.viatura)}</b></div>
-    <div class="row"><span>ID</span><b>${escapeHtml(p.id)}</b></div>
-    <div class="row"><span>Status atual</span><b>${escapeHtml(statusLabelManut(p.ultimo ? p.ultimo.status : ''))}</b></div>
-  `;
-  $('formCriar').style.display = 'none';
-  $('formFinalizar').style.display = 'none';
-  $('formEvento').style.display = 'grid';
-  const agora = new Date(getNowTime());
-  const pad = n => String(n).padStart(2,'0');
-  $('me-data').value = `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
-  $('me-tipo').value = 'Movimentação';
-  $('me-status').value = '';
-  $('me-solicitante').value = '';
-  $('me-informante').value = '';
-  $('me-detalhes').value = '';
-  montarCampoLocal('me-local-wrap', '', '', true, TIPO_VIATURA);
-  $('mm-delete').style.display = 'none';
-  $('mm-save').textContent = 'Adicionar';
-  $('mm-save').dataset.modo = 'evento';
-  $('mm-error').style.display = 'none';
-  showManutTab('novo');
-}
-
-function abrirFormCriar(){
-  if(!temPermissao('manut_criar')){ alert('Sem permissão.'); return; }
-  modoManutForm = 'criar';
-  processoAtual = null;
-  $('manutFormTitle').textContent = '🛠 Nova entrada';
-  $('manutFormHelp').textContent = 'Ao salvar, um processo com ID único será criado.';
-  $('procInfoBox').style.display = 'none';
-  $('formCriar').style.display = 'grid';
-  $('formEvento').style.display = 'none';
-  $('formFinalizar').style.display = 'none';
-  $('mm-tipo').value = '';
-  $('mm-viatura').value = '';
-  $('mm-status').value = 'Em Manutenção';
-  const agora = new Date(getNowTime());
-  const pad = n => String(n).padStart(2,'0');
-  $('mm-entrada').value = `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
-  $('mm-data-ag').value = '';
-  $('mm-hora-ag').value = '08:00';
-  $('mm-solicitante').value = '';
-  $('mm-informante').value = '';
-  $('mm-detalhes').value = '';
-  montarCampoLocal('mm-local-wrap', '', 'Em Manutenção', false, '');
-  $('mm-delete').style.display = 'none';
-  $('mm-save').textContent = 'Salvar';
-  $('mm-save').dataset.modo = 'criar';
-  $('mm-error').style.display = 'none';
-  atualizarFormCriarPorTipo();
-}
-
-function atualizarFormCriarPorTipo(){
-  const tipo = $('mm-tipo').value;
-  const isAgend = tipo === TIPO_AGENDAMENTO;
-  const isOutro = tipo === TIPO_OUTRO;
-  $('mm-entrada-label').style.display = isAgend ? 'none' : '';
-  $('mm-data-ag-label').style.display = isAgend ? '' : 'none';
-  $('mm-hora-ag-label').style.display = isAgend ? '' : 'none';
-  $('mm-viatura-label').style.display = isOutro ? 'none' : '';
-  $('mm-status-label').style.display = isOutro ? 'none' : '';
-  const statusAtual = isAgend ? 'Reserva' : $('mm-status').value;
-  montarCampoLocal('mm-local-wrap', lerLocalForm('mm-local-wrap'), statusAtual, false, tipo);
-}
-
-function showManutTab(tab){
-  activeManutTab = tab;
-  document.querySelectorAll('.manut-panel').forEach(p => p.classList.remove('active'));
-  const panel = $('manutPanel-' + tab); if(panel) panel.classList.add('active');
-  document.querySelectorAll('[data-manut-tab]').forEach(b => b.classList.toggle('active', b.dataset.manutTab === tab));
-}
-
-async function salvarFormManut(){
-  const err = $('mm-error'); const btn = $('mm-save');
-  err.style.display = 'none'; err.textContent = '';
-  btn.disabled = true; const oldTxt = btn.textContent; btn.textContent = 'Salvando…';
-  try{
-    if(modoManutForm === 'criar'){
-      const tipo = $('mm-tipo').value;
-      if(!tipo) throw new Error('Selecione o tipo.');
-      const payload = {
-        tipo,
-        viatura: tipo === TIPO_OUTRO ? '' : $('mm-viatura').value.trim(),
-        status: $('mm-status').value,
-        solicitante: $('mm-solicitante').value.trim(),
-        informante: $('mm-informante').value.trim(),
-        detalhes: $('mm-detalhes').value.trim(),
-        local: lerLocalForm('mm-local-wrap')
-      };
-      if(tipo === TIPO_AGENDAMENTO){
-        if(!$('mm-data-ag').value) throw new Error('Informe a data agendada.');
-        payload.data = $('mm-data-ag').value;
-        payload.hora = $('mm-hora-ag').value || '08:00';
-        payload.status = 'Reserva';
-      } else {
-        if(!payload.viatura) throw new Error('Informe a viatura.');
-        payload.data = $('mm-entrada').value;
-      }
-      const r = await apiManut('criarProcesso', payload);
-      if(!r.ok) throw new Error(r.error || 'Falha ao criar processo.');
-      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-      await loadDataManut();
-      mostrarSucesso(r.processo || {}, 'criar');
-      showManutTab('registros');
-    } else if(modoManutForm === 'evento'){
-      if(!processoAtual) throw new Error('Processo não carregado.');
-      
-      // ⬇️ AQUI ESTÁ A CORREÇÃO ⬇️
-      const payload = {
-        id: processoAtual.id,
-        evento: $('me-tipo').value,
-        tipo: $('me-tipo').value,        // Adicionado para o backend
-        tipoEvento: $('me-tipo').value,  // Adicionado para o backend
-        data: $('me-data').value,
-        dataEvento: $('me-data').value,  // Adicionado para o backend
-        status: $('me-status').value || '',
-        local: lerLocalForm('me-local-wrap'),
-        solicitante: $('me-solicitante').value.trim(),
-        informante: $('me-informante').value.trim(),
-        detalhes: $('me-detalhes').value.trim()
-      };
-      
-      if(!payload.data) throw new Error('Informe a data do evento.');
-      const r = await apiManut('adicionarEvento', payload);
-      if(!r.ok) throw new Error(r.error || 'Falha ao adicionar evento.');
-      _ultimoEventoAdicionado[processoAtual.id] = Date.now();
-      _persistirDesfazer();
-      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-      await loadDataManut();
-      mostrarSucesso(processoAtual, 'evento');
-      showManutTab('registros');
-    }
-  }catch(e){
-    err.textContent = e.message || 'Erro desconhecido.';
-    err.style.display = 'block';
-  }
-  btn.disabled = false; btn.textContent = oldTxt;
-}
-
-async function excluirProcessoAtual(){
-  if(!processoAtual) return;
-  const podeApagar = processoAtual.aberto ? temPermissao('manut_excluir') : temPermissao('manut_excluir_fechado');
-  if(!podeApagar){ alert('Sem permissão.'); return; }
-  if(!confirm('Excluir o processo ' + processoAtual.id + '?')) return;
-  const r = await apiManut('removerProcesso', { id: processoAtual.id });
-  if(!r.ok){ alert('Erro: ' + r.error); return; }
-  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-  await loadDataManut();
-  showManutTab('registros');
-}
-
-// ─────────────────────────────────────────────────────────
-// Sucesso / WhatsApp
-// ─────────────────────────────────────────────────────────
-let _sucessoPayloadAtual = null;
-function mostrarSucesso(proc, modo){
-  _sucessoPayloadAtual = { proc, modo };
-  const titulo = $('sucessoTitulo'); const sub = $('sucessoSub'); const resumo = $('sucessoResumo');
-  if(modo === 'criar'){
-    titulo.textContent = 'Processo registrado!';
-    sub.textContent = 'O processo foi criado com sucesso.';
-    resumo.innerHTML = `
-      <div class="resumo-row"><span>ID</span><b>${escapeHtml(proc.id || '—')}</b></div>
-      <div class="resumo-row"><span>Viatura</span><b>${escapeHtml(proc.viatura || '—')}</b></div>
-      <div class="resumo-row"><span>Tipo</span><b>${escapeHtml(proc.tipo || '—')}</b></div>
-    `;
-  } else if(modo === 'finalizar'){
-    titulo.textContent = 'Processo finalizado!';
-    sub.textContent = 'A viatura foi liberada.';
-    resumo.innerHTML = `
-      <div class="resumo-row"><span>ID</span><b>${escapeHtml(proc.id)}</b></div>
-      <div class="resumo-row"><span>Viatura</span><b>${escapeHtml(proc.viatura)}</b></div>
-    `;
-  } else {
-    titulo.textContent = 'Evento adicionado!';
-    sub.textContent = 'O evento foi registrado no processo.';
-    resumo.innerHTML = `
-      <div class="resumo-row"><span>ID</span><b>${escapeHtml(proc.id)}</b></div>
-      <div class="resumo-row"><span>Viatura</span><b>${escapeHtml(proc.viatura)}</b></div>
-    `;
-  }
-  $('sucessoModal').style.display = 'flex';
-}
-
-function montarMensagemEntrada(p){
-  const linhas = [
-    '🛠 *Processo ' + p.id + '*',
-    '🚗 Viatura: ' + p.viatura,
-    '📥 Entrada: ' + (p.entrada ? p.entrada.data : '—'),
-    '📍 Local: ' + (p.ultimo && p.ultimo.local ? p.ultimo.local : '—'),
-    '🟡 Status: ' + statusLabelManut(p.ultimo ? p.ultimo.status : '')
-  ];
-  if(p.solicitante) linhas.push('👤 Solicitante: ' + p.solicitante);
-  if(p.entrada && p.entrada.detalhes) linhas.push('📝 ' + p.entrada.detalhes);
-  return linhas.join('\n');
-}
-
-function montarMensagemFinalizacao(p){
-  const linhas = [
-    '✅ *Processo finalizado — ' + p.id + '*',
-    '🚗 Viatura: ' + p.viatura,
-    '📥 Entrada: ' + (p.entrada ? p.entrada.data : '—'),
-    '📤 Saída: ' + (p.finalizacao ? p.finalizacao.data : '—'),
-    '📍 Status final: ' + statusLabelManut(p.finalizacao ? p.finalizacao.status : '')
-  ];
-  if(p.dias > 0) linhas.push('⏱ Duração: ' + p.dias + ' dia(s)');
-  if(p.finalizacao && p.finalizacao.detalhes) linhas.push('📝 ' + p.finalizacao.detalhes);
-  return linhas.join('\n');
-}
-
-function abrirWhatsApp(msg){
-  const url = 'https://wa.me/' + (WHATSAPP_DESTINO ? WHATSAPP_DESTINO : '') + '?text=' + encodeURIComponent(msg);
-  window.open(url, '_blank');
-}
-
-// ─────────────────────────────────────────────────────────
-// Relatório de Manutenção
-// ─────────────────────────────────────────────────────────
-function manutReportPopularMeses(){
-  const grupos = agruparPorProcesso();
-  const meses = new Set();
-  Object.values(grupos).forEach(g => {
-    if(g.entrada && g.entrada.data){
-      const d = parseDataManut(g.entrada.data);
-      if(d) meses.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
-    }
+function getMesesDisponiveisManut(){
+  const set = new Set();
+  MANUT_EVENTOS.forEach(e => {
+    const d = parseDataManut(e.data);
+    if(!d) return;
+    set.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
   });
-  const sel = $('manutReportMonth');
-  sel.innerHTML = '<option value="">Todos os meses</option>' +
-    Array.from(meses).sort().reverse().map(m => `<option value="${m}">${formatarMesAno(m)}</option>`).join('');
+  return Array.from(set).sort().reverse();
 }
-
-function manutReportAplicarFiltros(grupos){
+function abrirRelatorioManut(){
+  const select = $('manutReportMonth'); const meses = getMesesDisponiveisManut();
+  select.innerHTML = '<option value="">Todos os meses</option>' + meses.map(ym => `<option value="${escapeAttr(ym)}">${escapeHtml(formatarMesAno(ym))}</option>`).join('');
+  select.value = '';
+  $('manutReportMode').value = 'detalhado';
+  const selStatus = $('manutReportStatus'); if(selStatus) selStatus.value = '';
+  manutRepStatusFiltro = '';
+  const agora = new Date();
+  $('manutReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
+  renderRelatorioManut();
+  _abrirReportModal('manutReportModal');
+}
+function atualizarVisibilidadeModoManut(){
+  const modo = $('manutReportMode').value;
+  const isMes = modo === 'mes';
+  $('manutReportDetalhado').style.display = isMes ? 'none' : '';
+  $('manutReportPorMes').style.display = isMes ? '' : 'none';
+  const periodoWrap = $('manutReportPeriodWrap');
+  if(periodoWrap) periodoWrap.style.display = isMes ? 'none' : 'flex';
+}
+function renderRelatorioManut(){
+  atualizarVisibilidadeModoManut();
+  const modo = $('manutReportMode').value;
+  if(modo === 'mes') renderRelatorioManutPorMes();
+  else renderRelatorioManutDetalhado();
+}
+function renderRelatorioManutDetalhado(){
   const mes = $('manutReportMonth').value;
-  const statusF = $('manutReportStatus').value;
-  let ids = Object.keys(grupos);
-  if(mes) ids = ids.filter(id => {
-    const g = grupos[id];
-    if(!g.entrada || !g.entrada.data) return false;
-    const d = parseDataManut(g.entrada.data);
-    return d && (d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')) === mes;
+  const grupos = agruparPorProcesso();
+  let procs = Object.values(grupos);
+  if(mes){
+    procs = procs.filter(p => {
+      const d = parseDataManut(p.entrada ? p.entrada.data : '');
+      if(!d) return false;
+      return (d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')) === mes;
+    });
+  }
+  if(manutRepStatusFiltro){
+    const alvoClasse = statusClasseManut(manutRepStatusFiltro);
+    procs = procs.filter(p => statusClasseManut(p.ultimo ? p.ultimo.status : '') === alvoClasse);
+  }
+  procs.sort((a, b) => {
+    const da = parseDataManut(a.entrada ? a.entrada.data : '');
+    const db = parseDataManut(b.entrada ? b.entrada.data : '');
+    return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
   });
-  if(statusF) ids = ids.filter(id => {
-    const g = grupos[id];
-    const label = statusLabelManut(g.ultimo ? g.ultimo.status : '');
-    if(statusF === 'Agendado') return g.tipo === TIPO_AGENDAMENTO && g.aberto && !g.agendamentoConvertido;
-    if(statusF === 'Convertido') return g.tipo === TIPO_AGENDAMENTO && g.agendamentoConvertido;
-    return label === statusF;
-  });
-  return ids.map(id => grupos[id]);
-}
-
-function manutReportRenderDetalhado(procs){
-  $('manutReportDetalhado').style.display = '';
-  $('manutReportPorMes').style.display = 'none';
+  const filtroTxt = mes ? 'Mês: ' + formatarMesAno(mes) : 'Todos os meses';
+  const statusTxt = manutRepStatusFiltro ? ' · Status: ' + escapeHtml(manutRepStatusFiltro) : '';
+  $('manutReportFilters').innerHTML = '<b>' + escapeHtml(filtroTxt) + '</b>' + statusTxt + ' · <b>Processos:</b> ' + procs.length;
   $('manutReportBody').innerHTML = procs.length === 0
-    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhum registro encontrado</td></tr>'
+    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhum processo neste período</td></tr>'
     : procs.map(p => {
-        const dias = p.finalizacao ? p.dias : Math.floor((getNowTime() - (parseDataManut(p.entrada ? p.entrada.data : '')?.getTime() || getNowTime())) / 86400000);
+        const cor = corStatus(statusClasseManut(p.ultimo ? p.ultimo.status : ''));
+        const entrada = p.entrada ? p.entrada.data : '—';
+        const saida = p.finalizacao ? p.finalizacao.data : '--';
+        const statusL = statusLabelManut(p.ultimo ? p.ultimo.status : '');
+        const temDias = p.finalizacao && p.dias > 0;
+        const diasTxt = temDias ? p.dias + 'd' : '—';
+        const diasClass = temDias ? 'dias' : 'dias vazio';
+        const inf = p.finalizacao ? p.finalizacao.informante : (p.entrada ? p.entrada.informante : '—');
+        const tipoProc = p.tipo || TIPO_VIATURA;
+        const tipoClass = tipoProc === TIPO_OUTRO ? 'outro' : (tipoProc === TIPO_AGENDAMENTO ? 'agendamento' : 'viatura');
         return `<tr>
           <td class="id">${escapeHtml(p.id)}</td>
-          <td>${escapeHtml(p.tipo || '—')}</td>
+          <td><span class="manut-proc-tipo ${tipoClass}">${escapeHtml(tipoProc)}</span></td>
           <td class="v">${escapeHtml(p.viatura)}</td>
-          <td class="date">${escapeHtml(p.entrada ? p.entrada.data : '—')}</td>
-          <td class="date">${escapeHtml(p.finalizacao ? p.finalizacao.data : '—')}</td>
-          <td class="status">${escapeHtml(statusLabelManut(p.ultimo ? p.ultimo.status : ''))}</td>
-          <td class="dias">${dias > 0 ? dias + 'd' : '—'}</td>
+          <td class="date">${escapeHtml(entrada)}</td>
+          <td class="date">${escapeHtml(saida)}</td>
+          <td class="status" style="color:${cor};">● ${escapeHtml(statusL)}</td>
+          <td class="${diasClass}">${escapeHtml(diasTxt)}</td>
           <td style="text-align:center;">${p.eventos.length}</td>
-          <td class="info">${escapeHtml(p.entrada && p.entrada.informante ? p.entrada.informante : '—')}</td>
+          <td class="info">${escapeHtml(inf)}</td>
         </tr>`;
       }).join('');
 }
-
-function manutReportRenderPorMes(procs){
-  $('manutReportDetalhado').style.display = 'none';
-  $('manutReportPorMes').style.display = '';
-  const porMes = {};
-  procs.forEach(p => {
-    if(!p.entrada || !p.entrada.data) return;
-    const d = parseDataManut(p.entrada.data);
+function renderRelatorioManutPorMes(){
+  const grupos = {};
+  MANUT_EVENTOS.forEach(e => {
+    if(manutRepStatusFiltro){
+      const alvoClasse = statusClasseManut(manutRepStatusFiltro);
+      if(statusClasseManut(e.status) !== alvoClasse) return;
+    }
+    const d = parseDataManut(e.data);
     if(!d) return;
-    const k = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-    (porMes[k] = porMes[k] || []).push(p);
+    const ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if(!grupos[ym]) grupos[ym] = {};
+    if(!grupos[ym][e.viatura]) grupos[ym][e.viatura] = { eventos: 0, dias: 0 };
+    grupos[ym][e.viatura].eventos += 1;
+    if(normalizeStr(e.evento).indexOf('finaliz') !== -1){
+      grupos[ym][e.viatura].dias += extrairDiasNumericos(e.dias);
+    }
   });
-  const html = Object.keys(porMes).sort().reverse().map(k => {
-    const lista = porMes[k];
-    return `<div class="mes-group">
-      <div class="mes-header">
-        <span>${formatarMesAno(k)}</span>
-        <span class="mes-count">${lista.length} processo(s)</span>
-      </div>
-      <table class="report-table">
-        <thead><tr><th>ID</th><th>Viatura</th><th>Entrada</th><th>Saída</th><th>Status</th><th style="text-align:right;">Dias</th></tr></thead>
-        <tbody>${lista.map(p => {
-          const dias = p.finalizacao ? p.dias : '';
-          return `<tr>
-            <td class="id">${escapeHtml(p.id)}</td>
-            <td class="v">${escapeHtml(p.viatura)}</td>
-            <td class="date">${escapeHtml(p.entrada ? p.entrada.data : '—')}</td>
-            <td class="date">${escapeHtml(p.finalizacao ? p.finalizacao.data : '—')}</td>
-            <td class="status">${escapeHtml(statusLabelManut(p.ultimo ? p.ultimo.status : ''))}</td>
-            <td class="dias ${dias ? '' : 'vazio'}">${dias ? dias + 'd' : '—'}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>`;
+  const meses = Object.keys(grupos).sort().reverse();
+  let totalGeralEventos = 0;
+  Object.keys(grupos).forEach(ym => { Object.keys(grupos[ym]).forEach(pfx => { totalGeralEventos += grupos[ym][pfx].eventos; }); });
+  const statusTxt = manutRepStatusFiltro ? ' · Status: ' + escapeHtml(manutRepStatusFiltro) : '';
+  $('manutReportFilters').innerHTML = '<b>Modo:</b> Por mês (agrupado)' + statusTxt + ' · <b>Meses:</b> ' + meses.length + ' · <b>Eventos totais:</b> ' + totalGeralEventos;
+  const container = $('manutReportMesContent');
+  if(meses.length === 0){
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-faint);">Nenhum registro encontrado</div>';
+    return;
+  }
+  container.innerHTML = meses.map(ym => {
+    const viaturas = Object.keys(grupos[ym]).sort((a,b)=>a.localeCompare(b));
+    let totalEventosMes = 0, totalDiasMes = 0;
+    const linhas = viaturas.map(pfx => {
+      const info = grupos[ym][pfx];
+      totalEventosMes += info.eventos;
+      totalDiasMes += info.dias;
+      return `<tr><td class="v">${escapeHtml(pfx)}</td><td class="status" style="text-align:center;">${info.eventos}</td><td class="dias">${info.dias}d</td></tr>`;
+    }).join('');
+    return `<div class="mes-group"><div class="mes-header"><span>${escapeHtml(formatarMesAno(ym))}</span><span class="mes-count">${totalEventosMes} evento${totalEventosMes>1?'s':''} · ${viaturas.length} viatura${viaturas.length>1?'s':''}</span></div><table class="report-table"><thead><tr><th>Viatura</th><th style="text-align:center;">Eventos</th><th style="text-align:right;">Dias fechados</th></tr></thead><tbody>${linhas}<tr class="total-row"><td>TOTAL DO MÊS</td><td style="text-align:center;">${totalEventosMes}</td><td style="text-align:right;">${totalDiasMes}d</td></tr></tbody></table></div>`;
   }).join('');
-  $('manutReportMesContent').innerHTML = html || '<div class="empty">Nenhum registro encontrado.</div>';
-}
-
-function manutReportRender(){
-  const grupos = agruparPorProcesso();
-  const procs = manutReportAplicarFiltros(grupos);
-  const modo = $('manutReportMode').value;
-  $('manutReportPeriodWrap').style.display = modo === 'mes' ? 'flex' : 'none';
-  if(modo === 'mes') manutReportRenderPorMes(procs); else manutReportRenderDetalhado(procs);
-  const filtrosAtivos = [];
-  if($('manutReportMonth').value) filtrosAtivos.push(formatarMesAno($('manutReportMonth').value));
-  if($('manutReportStatus').value) filtrosAtivos.push($('manutReportStatus').value);
-  $('manutReportFilters').innerHTML = '<b>Total:</b> ' + procs.length + ' processo(s)' + (filtrosAtivos.length ? ' · <b>Filtros:</b> ' + filtrosAtivos.join(' · ') : '');
-}
-
-function abrirRelatorioManut(){
-  manutReportPopularMeses();
-  const agora = new Date();
-  $('manutReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
-  manutReportRender();
-  _abrirReportModal('manutReportModal');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3406,322 +3164,506 @@ function abrirRelatorioManut(){
 // ═══════════════════════════════════════════════════════════════════════════
 let PREV_VIATURAS = [];
 let PREV_TAB_ATUAL = 'painel';
-let prevFiltroSituacao = '';
-let prevFiltroOleo = '';
-let prevFiltroTexto = '';
-let prevRepFiltroOleo = '';
-let prevRepFiltroPrevisao = '';
-let prevRepFiltroKm = '';
-let prevRepFiltroBusca = '';
+let PREV_FILTRO_SITUACAO = '';
+let PREV_FILTRO_OLEO = '';
 
-function normalizarPlacaPrev(s){ return String(s || '').trim().toUpperCase().replace(/[\s-]+/g, ''); }
+function parseDataBR(str){
+  var m = String(str||'').match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(!m) return null;
+  var d = new Date(+m[3], +m[2]-1, +m[1]);
+  if(d.getFullYear() < 1950) return null;
+  return d;
+}
+function formatarGarantiaPrev(g){
+  var s = String(g||'').trim().toUpperCase();
+  if(!s || s === '0') return '—';
+  if(s.indexOf('VENCID') !== -1) return 'Garantia VENCIDA';
+  var m = s.match(/FAZER\s+(\d)/);
+  if(m) return 'Garantia na ' + m[1] + '\u00AA revis\u00E3o';
+  return s;
+}
+function fmtKm(n){
+  if(n == null || isNaN(n)) return '—';
+  return Number(n).toLocaleString('pt-BR') + ' km';
+}
 
 async function loadDataPreventiva(){
-  const upd = $('prevUpdateStatus');
-  const CACHE_KEY_PREV = 'deman_cache_preventiva_v2';
-  const TTL = 2 * 60 * 1000;
+  if(activeView !== 'preventiva' && !PREV_VIATURAS.length) return;
+  var upd = $('prevUpdateStatus'); if(!upd) return;
   try{
-    const raw = sessionStorage.getItem(CACHE_KEY_PREV);
+    var raw = sessionStorage.getItem(STORAGE_KEY_PREV);
     if(raw){
-      const p = JSON.parse(raw);
-      if(p && Array.isArray(p.viaturas) && (Date.now() - p.ts) < TTL){
+      var p = JSON.parse(raw);
+      if(p && Array.isArray(p.viaturas) && (Date.now() - p.ts) < PREV_CACHE_TTL){
         PREV_VIATURAS = p.viaturas;
         upd.textContent = 'Cache · ' + new Date(p.ts).toLocaleTimeString('pt-BR');
-        if(activeView === 'preventiva') renderPreventiva();
-        return;
+        renderPreventiva();
       }
     }
   }catch(e){}
   upd.textContent = 'Atualizando…';
   try{
-    const r = await apiPrev('listarPreventiva');
+    var r = await apiPrev('listarPreventiva');
     if(!r.ok){ upd.textContent = 'Falha: ' + (r.error || 'desconhecido'); return; }
     PREV_VIATURAS = Array.isArray(r.viaturas) ? r.viaturas : [];
-    try{ sessionStorage.setItem(CACHE_KEY_PREV, JSON.stringify({ ts: Date.now(), viaturas: PREV_VIATURAS })); }catch(e){}
+    try{ sessionStorage.setItem(STORAGE_KEY_PREV, JSON.stringify({ ts: Date.now(), viaturas: PREV_VIATURAS })); }catch(e){}
     upd.textContent = 'Atualizado em ' + new Date().toLocaleTimeString('pt-BR');
-    if(activeView === 'preventiva') renderPreventiva();
+    renderPreventiva();
   }catch(err){
+    console.error(err);
     upd.textContent = 'Erro: ' + err.message;
   }
 }
 
-function calcularSituacaoOleo(v){
-  if (v.statusOleo) return v.statusOleo;
-  if(!v.kmAtual || !v.kmProxima) return 'vazio';
-  const diff = (v.kmProxima || 0) - (v.kmAtual || 0);
-  if(diff <= 0) return 'vermelho';
-  if(diff <= 2000) return 'amarelo';
-  return 'verde';
-}
-
-function renderPrevSummary(){
-  const total = PREV_VIATURAS.length;
-  const vermelho = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'vermelho').length;
-  const amarelo = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'amarelo').length;
-  const verde = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'verde').length;
-
-  $('prevSummary').innerHTML = `
-    <div class="summary-card manut-total"><div class="label">Total</div><div class="value">${total}</div></div>
-    <div class="summary-card manut-dias"><div class="label">🔴 Atrasadas</div><div class="value">${vermelho}</div></div>
-    <div class="summary-card manut-abertos"><div class="label">🟡 Próximas</div><div class="value">${amarelo}</div></div>
-    <div class="summary-card manut-fechados"><div class="label">🟢 Em dia</div><div class="value">${verde}</div></div>
-  `;
-}
-function renderPrevCards(){
-  const q = normalizeStr(prevFiltroTexto);
-  let lista = PREV_VIATURAS.filter(v => {
-    if(prevFiltroSituacao && normalizeStr(v.situacao) !== normalizeStr(prevFiltroSituacao)) return false;
-    if(prevFiltroOleo){
-      const sit = calcularSituacaoOleo(v);
-      if(sit !== prevFiltroOleo) return false;
-    }
-    if(q && !normalizeStr(v.prefixo).includes(q) && !normalizeStr(v.placa).includes(q)) return false;
-    return true;
-  });
-  
-  if(lista.length === 0){
-    $('prevContent').innerHTML = '<div class="prev-empty">Nenhuma viatura encontrada.</div>';
-    return;
+function renderCardPreventiva(v){
+  var cor = v.statusOleo || 'vazio';
+  var faixaLabel, faixaValor, faixaIcone;
+  if(cor === 'vazio'){
+    faixaLabel = 'Sem dados de km';
+  } else {
+    faixaValor = Math.abs(v.falta || 0);
+    faixaLabel = (v.falta <= 0 ? 'PASSOU ' : 'FALTAM ') + faixaValor.toLocaleString('pt-BR') + ' km';
+    faixaIcone = cor === 'vermelho' ? '🔴 ' : (cor === 'amarelo' ? '🟡 ' : '🟢 ');
   }
-  
-  lista.sort((a,b) => a.prefixo.localeCompare(b.prefixo));
-  
-  $('prevContent').innerHTML = lista.map(v => {
-    const sit = calcularSituacaoOleo(v);
-    
-    // Pega os dados exatos calculados pelo backend
-    const proxTroca = v.kmProxima;
-    const falta = v.falta; // Se for negativo, passou. Se positivo, ainda falta.
-    
-    // Configuração do visual da faixa inferior
-    let faixaClass = sit;
-    let faixaTexto = '— SEM DADOS';
-    let iconeFaixa = '';
-    
-    if (sit !== 'vazio' && falta != null) {
-      if (falta <= 0) {
-        faixaTexto = `PASSOU ${Math.abs(falta).toLocaleString('pt-BR')} km`;
-        iconeFaixa = `<span class="dot" style="background:var(--vermelho);"></span>`;
-      } else {
-        faixaTexto = `FALTAM ${falta.toLocaleString('pt-BR')} km`;
-        iconeFaixa = `<span class="dot" style="background:var(--verde);"></span>`;
-      }
-    }
-
-    // Formatação da garantia
-    const txtGarantia = v.garantia ? `Garantia ${v.garantia}` : '—';
-    const atrasoKm = (falta != null && falta <= 0);
-
-    return `<div class="prev-card ${faixaClass}">
-      <div class="prev-head">
-        <div class="prev-titulo">
-          <span class="prev-prefixo">${escapeHtml(v.prefixo)}</span>
-          <span class="prev-placa">${escapeHtml(v.placa || '—')}</span>
-        </div>
-        <div class="prev-sub">
-          <span>${escapeHtml(v.situacao || '—')}</span>
-          <span class="sep">·</span>
-          <span>${escapeHtml(txtGarantia)}</span>
-        </div>
-      </div>
-      
-      <div class="prev-body">
-        <div class="prev-row">
-          <span class="lbl">KM atual</span>
-          <span class="val">${v.kmAtual ? Number(v.kmAtual).toLocaleString('pt-BR') : '—'}</span>
-        </div>
-        <div class="prev-row">
-          <span class="lbl">Próx. troca</span>
-          <span class="val ${atrasoKm ? 'atraso' : ''}">${proxTroca ? Number(proxTroca).toLocaleString('pt-BR') : '—'}</span>
-        </div>
-        <div class="prev-row">
-          <span class="lbl">OS troca</span>
-          <span class="val">${escapeHtml(v.osTroca || '—')}</span>
-        </div>
-        
-        ${v.proximaTroca ? `
-        <div class="prev-data">
-          <span style="background:var(--surface); border:1px solid var(--border); padding:2px 6px; border-radius:4px; font-size:10px; margin-right:4px;">📅</span> 
-          ${escapeHtml(v.proximaTroca)}
-        </div>` : ''}
-      </div>
-      
-      <div class="prev-faixa ${faixaClass}">
-        ${iconeFaixa} ${faixaTexto}
-      </div>
-    </div>`;
-  }).join('');
+  var dataProx = v.proximaTroca || '';
+  var dataVencida = false;
+  if(dataProx){
+    var d = parseDataBR(dataProx);
+    if(d && d < new Date()) dataVencida = true;
+  }
+  var kmProxAtrasada = (v.kmProxima != null && v.kmAtual != null && v.kmProxima <= v.kmAtual);
+  return '<div class="prev-card ' + cor + '">' +
+    '<div class="prev-head">' +
+      '<div class="prev-titulo">' +
+        '<span class="prev-prefixo">' + escapeHtml(v.prefixo) + '</span>' +
+        '<span class="prev-placa">' + escapeHtml(v.placa) + '</span>' +
+      '</div>' +
+      '<div class="prev-sub">' +
+        '<span>' + escapeHtml(v.situacao || '—') + '</span>' +
+        '<span class="sep">·</span>' +
+        '<span>' + escapeHtml(formatarGarantiaPrev(v.garantia)) + '</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="prev-body">' +
+      '<div class="prev-row"><span class="lbl">KM atual</span><span class="val">' + fmtKm(v.kmAtual) + '</span></div>' +
+      '<div class="prev-row"><span class="lbl">Pr\u00F3x. troca</span><span class="val' + (kmProxAtrasada ? ' atraso' : '') + '">' + fmtKm(v.kmProxima) + '</span></div>' +
+      (v.osTroca ? '<div class="prev-row"><span class="lbl">OS troca</span><span class="val">' + escapeHtml(v.osTroca) + '</span></div>' : '') +
+      '<div class="prev-data">📅 ' + (dataProx || '—') + (dataVencida ? ' <span class="vencida">· vencida</span>' : '') + '</div>' +
+    '</div>' +
+    '<div class="prev-faixa ' + cor + '">' + (faixaIcone || '') + escapeHtml(faixaLabel) + '</div>' +
+  '</div>';
 }
 
 function renderPreventiva(){
   if(activeView !== 'preventiva') return;
-  renderPrevSummary();
-  renderPrevCards();
-  const clearBtn = $('prevClearFilterBtn');
-  if(clearBtn) clearBtn.style.display = (prevFiltroSituacao || prevFiltroOleo || prevFiltroTexto) ? 'inline-block' : 'none';
-}
-
-function showPrevTab(tab){
-  PREV_TAB_ATUAL = tab;
-  document.querySelectorAll('.prev-panel').forEach(p => p.classList.remove('active'));
-  const panel = $('prevPanel-' + tab); if(panel) panel.classList.add('active');
-  document.querySelectorAll('[data-prev-tab]').forEach(b => b.classList.toggle('active', b.dataset.prevTab === tab));
-  if(tab === 'pneus' && !PREV_VIATURAS.length) loadDataPreventiva();
-}
-
-// ─── Dropdown de busca (compartilhado por atualizar e pneus) ───
-function renderDropdownGenerico(prefixo, filtro, onSelect){
-  const drop = $(prefixo + '-dropdown');
-  const q = normalizeStr(filtro);
-  if(!q){ drop.classList.remove('open'); drop.innerHTML = ''; return; }
-  const matches = PREV_VIATURAS.filter(v =>
-    normalizeStr(v.prefixo).includes(q) || normalizeStr(v.placa).includes(q)
-  ).slice(0, 20);
-  if(matches.length === 0){
-    drop.innerHTML = '<div class="pf-dropdown-empty">Nenhuma viatura encontrada.</div>';
-    drop.classList.add('open'); return;
+  var container = $('prevContent'); if(!container) return;
+  var q = normalizeStr($('prevSearch').value);
+  var lista = PREV_VIATURAS.slice();
+  if(PREV_FILTRO_SITUACAO){
+    var alvo = normalizeStr(PREV_FILTRO_SITUACAO);
+    lista = lista.filter(function(v){ return normalizeStr(v.situacao).indexOf(alvo) !== -1; });
   }
-  drop.innerHTML = matches.map(v => `
-    <div class="pf-dropdown-item" data-prefixo="${escapeAttr(v.prefixo)}">
-      <span class="pf-di-prefix">${escapeHtml(v.prefixo)}</span>
-      <span class="pf-di-placa">${escapeHtml(v.placa || '—')}</span>
-    </div>
-  `).join('');
-  drop.classList.add('open');
-  drop.querySelectorAll('.pf-dropdown-item').forEach(item => {
-    item.addEventListener('click', () => {
-      const v = matches.find(x => x.prefixo === item.dataset.prefixo);
-      if(v) onSelect(v);
-      drop.classList.remove('open');
+  if(PREV_FILTRO_OLEO){
+    lista = lista.filter(function(v){ return v.statusOleo === PREV_FILTRO_OLEO; });
+  }
+  if(q){
+    lista = lista.filter(function(v){
+      return normalizeStr(v.prefixo).indexOf(q) !== -1 || normalizeStr(v.placa).indexOf(q) !== -1;
+    });
+  }
+  var ordem = { vermelho:0, amarelo:1, verde:2, vazio:3 };
+  lista.sort(function(a, b){
+    var oa = ordem[a.statusOleo] == null ? 3 : ordem[a.statusOleo];
+    var ob = ordem[b.statusOleo] == null ? 3 : ordem[b.statusOleo];
+    if(oa !== ob) return oa - ob;
+    return String(a.prefixo).localeCompare(String(b.prefixo));
+  });
+
+  var qtdAtrasadas = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'vermelho'; }).length;
+  var qtdProximas  = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'amarelo'; }).length;
+  var qtdEmDia     = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'verde'; }).length;
+
+  var clsAtras = PREV_FILTRO_OLEO === 'vermelho' ? ' active-filter' : '';
+  var clsProx  = PREV_FILTRO_OLEO === 'amarelo'  ? ' active-filter' : '';
+  var clsDia   = PREV_FILTRO_OLEO === 'verde'    ? ' active-filter' : '';
+
+  $('prevSummary').innerHTML =
+    '<div class="summary-card baixadas' + clsAtras + '" data-prev-filter="vermelho"><div class="label">🔴 Óleo atrasado (km)</div><div class="value">' + qtdAtrasadas + '</div></div>' +
+    '<div class="summary-card manut-abertos' + clsProx + '" data-prev-filter="amarelo"><div class="label">🟡 Próximas da troca</div><div class="value">' + qtdProximas + '</div></div>' +
+    '<div class="summary-card manut-fechados' + clsDia + '" data-prev-filter="verde"><div class="label">🟢 Em dia</div><div class="value">' + qtdEmDia + '</div></div>';
+
+  document.querySelectorAll('#prevSummary .summary-card').forEach(function(card){
+    card.addEventListener('click', function(){
+      var f = card.dataset.prevFilter;
+      PREV_FILTRO_OLEO = (PREV_FILTRO_OLEO === f) ? '' : f;
+      var sel = $('prevFiltroOleo'); if(sel) sel.value = PREV_FILTRO_OLEO;
+      renderPreventiva();
     });
   });
+
+  if(lista.length === 0){
+    container.innerHTML = '<div class="prev-empty">Nenhuma viatura encontrada.</div>';
+    var cb0 = $('prevClearFilterBtn'); if(cb0) cb0.style.display = (PREV_FILTRO_SITUACAO || PREV_FILTRO_OLEO || q) ? 'inline-block' : 'none';
+    return;
+  }
+  container.innerHTML = lista.map(renderCardPreventiva).join('');
+  var cb = $('prevClearFilterBtn');
+  if(cb) cb.style.display = (PREV_FILTRO_SITUACAO || PREV_FILTRO_OLEO || q) ? 'inline-block' : 'none';
 }
 
-// ─── Atualizar KM / troca de óleo ───
-let _viaturaSelecionadaPrev = null;
-function selecionarViaturaPrev(v){
-  _viaturaSelecionadaPrev = v;
-  $('pf-busca').value = v.prefixo + ' — ' + (v.placa || '');
-  $('pf-dropdown').classList.remove('open');
+function setSidebarPrevExpanded(v){
+  var sub = $('sidebarSubPrev'); var parent = $('sidebarPrevParent');
+  if(sub) sub.classList.toggle('open', !!v);
+  if(parent) parent.classList.toggle('expanded', !!v);
+}
+function showPrevTab(name){
+  if(name !== 'painel' && name !== 'atualizar' && name !== 'pneus') return;
+  if(name !== 'painel' && !temPermissao('prev_editar_km')) name = 'painel';
+  PREV_TAB_ATUAL = name;
+  document.querySelectorAll('#sidebarSubPrev .sidebar-sublink').forEach(b => { b.classList.toggle('active', b.dataset.prevTab === name); });
+  var pPainel = $('prevPanel-painel'); var pAtual = $('prevPanel-atualizar'); var pPneus = $('prevPanel-pneus');
+  if(pPainel) pPainel.classList.toggle('active', name === 'painel');
+  if(pAtual)  pAtual.classList.toggle('active', name === 'atualizar');
+  if(pPneus)  pPneus.classList.toggle('active', name === 'pneus');
+  setSidebarPrevExpanded(true);
+  window.scrollTo(0, 0);
+  if(name === 'atualizar'){
+    if(PREV_LISTA_COMPLETA.length === 0) loadListaCompletaPreventiva();
+    setTimeout(() => { var i = $('pf-busca'); if(i) i.focus({ preventScroll: true }); }, 60);
+  }
+  if(name === 'pneus'){
+    if(PREV_LISTA_COMPLETA.length === 0) loadListaCompletaPreventiva();
+    setTimeout(() => { var i = $('pneus-busca'); if(i) i.focus({ preventScroll: true }); }, 60);
+  }
+}
+async function loadListaCompletaPreventiva(){
+  try{
+    var r = await apiPrev('listarTodasViaturas');
+    if(!r.ok){ console.error('listarTodasViaturas:', r.error); return; }
+    PREV_LISTA_COMPLETA = Array.isArray(r.viaturas) ? r.viaturas : [];
+  }catch(e){ console.error(e); }
+}
+function _fmtKmPrev(n){ if(n == null || isNaN(n)) return '—'; return Number(n).toLocaleString('pt-BR') + ' km'; }
+function _fmtDataISOparaBR(iso){
+  if(!iso) return '';
+  var p = String(iso).split('-');
+  if(p.length !== 3) return iso;
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+function selecionarViaturaPreventiva(prefixo){
+  var v = PREV_LISTA_COMPLETA.find(function(x){ return x.prefixo === prefixo; });
+  if(!v) return;
+  PREV_VIATURA_SELECIONADA = v;
   $('pf-info').classList.add('show');
-  $('pf-info-prefixo').textContent = v.prefixo;
+  $('pf-info-prefixo').textContent = v.prefixo + (v.locado ? ' · locada' : '');
   $('pf-info-placa').textContent = v.placa || '—';
-  $('pf-info-km').textContent = v.kmAtual ? Number(v.kmAtual).toLocaleString('pt-BR') : '—';
-  $('pf-info-data').textContent = v.dataTroca || '—';
-  $('pf-info-kmtroca').textContent = v.kmTroca ? Number(v.kmTroca).toLocaleString('pt-BR') : '—';
+  $('pf-info-km').textContent = _fmtKmPrev(v.kmAtual);
+  $('pf-info-data').textContent = v.ultimaTroca || '—';
+  $('pf-info-kmtroca').textContent = _fmtKmPrev(v.kmUltima);
   $('pf-info-os').textContent = v.osTroca || '—';
   $('pf-busca-dica').textContent = 'Viatura selecionada.';
-  $('pf-busca-dica').className = 'dica positivo';
-  $('pf-km').value = v.kmAtual || '';
+  atualizarDicaKm();
+}
+function atualizarDicaKm(){
+  var dica = $('pf-km-dica'); if(!dica) return;
+  var raw = $('pf-km').value.trim();
+  if(!raw){ dica.textContent = '—'; dica.className = 'dica'; return; }
+  var n = parseFloat(raw.replace(/\./g,'').replace(',', '.'));
+  if(isNaN(n)){ dica.textContent = 'Valor inválido.'; dica.className = 'dica negativo'; return; }
+  if(!PREV_VIATURA_SELECIONADA || PREV_VIATURA_SELECIONADA.kmAtual == null){
+    dica.textContent = 'Sem referência anterior.'; dica.className = 'dica'; return;
+  }
+  var antigo = PREV_VIATURA_SELECIONADA.kmAtual;
+  var dif = n - antigo;
+  var sinal = dif >= 0 ? '+' : '';
+  dica.textContent = sinal + dif.toLocaleString('pt-BR') + ' km (antes: ' + antigo.toLocaleString('pt-BR') + ')';
+  dica.className = 'dica ' + (dif < 0 ? 'negativo' : 'positivo');
+}
+function limparFormularioPreventiva(){
+  PREV_VIATURA_SELECIONADA = null;
+  $('pf-busca').value = '';
+  $('pf-busca-dica').textContent = 'Digite para filtrar. Selecione uma viatura para continuar.';
+  $('pf-info').classList.remove('show');
+  $('pf-km').value = '';
+  $('pf-km-dica').textContent = '—';
+  $('pf-km-dica').className = 'dica';
   $('pf-data').value = '';
   $('pf-kmtroca').value = '';
   $('pf-os').value = '';
-  $('pf-km-dica').textContent = v.kmAtual ? 'KM atual: ' + Number(v.kmAtual).toLocaleString('pt-BR') : '—';
-  $('pf-km-dica').className = 'dica';
+  $('pf-error').style.display = 'none';
+  $('pf-error').textContent = '';
+  fecharDropdownViaturas();
+}
+async function salvarPreventivaForm(){
+  var err = $('pf-error'); var btn = $('pf-save');
+  err.style.display = 'none'; err.textContent = '';
+  if(!PREV_VIATURA_SELECIONADA){ err.textContent = 'Selecione uma viatura primeiro.'; err.style.display = 'block'; return; }
+  var kmRaw = $('pf-km').value.trim();
+  var dataTroca = $('pf-data').value;
+  var kmTrocaRaw = $('pf-kmtroca').value.trim();
+  var osTroca = $('pf-os').value.trim();
+  var temKm = kmRaw !== '';
+  var preencheuAlgoTroca = (dataTroca || kmTrocaRaw || osTroca);
+  var trocaCompleta = (dataTroca && kmTrocaRaw && osTroca);
+  if(!temKm && !preencheuAlgoTroca){ err.textContent = 'Preencha o KM atual ou os campos da troca.'; err.style.display = 'block'; return; }
+  if(preencheuAlgoTroca && !trocaCompleta){ err.textContent = 'A troca de óleo precisa dos 3 campos: data, KM e OS.'; err.style.display = 'block'; return; }
+  if(temKm && PREV_VIATURA_SELECIONADA.kmAtual != null){
+    var novoKm = parseFloat(kmRaw.replace(/\./g,'').replace(',', '.'));
+    if(!isNaN(novoKm) && novoKm < PREV_VIATURA_SELECIONADA.kmAtual){
+      var antigoFmt = PREV_VIATURA_SELECIONADA.kmAtual.toLocaleString('pt-BR');
+      var novoFmt = novoKm.toLocaleString('pt-BR');
+      if(!confirm('⚠️ O novo KM (' + novoFmt + ') é menor que o atual (' + antigoFmt + ').\n\nConfirma?')) return;
+    }
+  }
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  var payload = { prefixo: PREV_VIATURA_SELECIONADA.prefixo };
+  if(temKm) payload.novoKm = kmRaw;
+  if(trocaCompleta){
+    payload.dataTroca = _fmtDataISOparaBR(dataTroca);
+    payload.kmTroca = kmTrocaRaw;
+    payload.osTroca = osTroca;
+  }
+  let r;
+  try {
+    r = await apiPrev('salvarPreventiva', payload);
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar';
+  }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
+  var resumo = [];
+  if(r.acoes && r.acoes.km){
+    var a = r.acoes.km;
+    var dif = a.diferenca != null ? (a.diferenca >= 0 ? '+' : '') + a.diferenca.toLocaleString('pt-BR') : '—';
+    resumo.push(['KM atual', (a.kmAntigo != null ? a.kmAntigo.toLocaleString('pt-BR') : '—') + ' → ' + a.kmNovo.toLocaleString('pt-BR') + ' (' + dif + ')']);
+  }
+  if(r.acoes && r.acoes.troca){
+    var t = r.acoes.troca;
+    resumo.push(['Data da troca', t.dataTroca]);
+    resumo.push(['KM da troca', Number(t.kmTroca).toLocaleString('pt-BR') + ' km']);
+    resumo.push(['OS da troca', t.osTroca]);
+  }
+  limparFormularioPreventiva();
+  try{ sessionStorage.removeItem(STORAGE_KEY_PREV); }catch(e){}
+  await Promise.all([loadListaCompletaPreventiva(), loadDataPreventiva()]);
+  mostrarSucesso({ titulo: 'Manutenção registrada!', sub: 'Viatura: ' + payload.prefixo, resumo: resumo, mensagemWhats: '' });
 }
 
-async function salvarPreventivaForm(){
-  const err = $('pf-error'); err.style.display = 'none';
-  if(!_viaturaSelecionadaPrev){ err.textContent = 'Selecione uma viatura.'; err.style.display = 'block'; return; }
-  const kmNovo = $('pf-km').value.trim();
-  const dataT = $('pf-data').value.trim();
-  const kmT = $('pf-kmtroca').value.trim();
-  const osT = $('pf-os').value.trim();
-  const temTroca = dataT || kmT || osT;
-  if(!kmNovo && !temTroca){ err.textContent = 'Preencha o KM atual ou os dados da troca.'; err.style.display = 'block'; return; }
-  if(temTroca && (!dataT || !kmT || !osT)){ err.textContent = 'Preencha os três campos da troca ou deixe os três vazios.'; err.style.display = 'block'; return; }
-  const btn = $('pf-save'); btn.disabled = true; btn.textContent = 'Salvando…';
-  const payload = {
-    prefixo: _viaturaSelecionadaPrev.prefixo,
-    kmAtual: kmNovo || null,
-    dataTroca: dataT || null,
-    kmTroca: kmT || null,
-    osTroca: osT || null
-  };
-  const r = await apiPrev('atualizarPreventiva', payload);
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(!r.ok){ err.textContent = r.error || 'Falha ao salvar.'; err.style.display = 'block'; return; }
-  try{ sessionStorage.removeItem('deman_cache_preventiva_v2'); }catch(e){}
-  await loadDataPreventiva();
-  $('pf-cancel').click();
-  alert('Dados salvos com sucesso!');
+// ─── Dropdown Viaturas ───
+function _normalizaBusca(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
+function renderDropdownViaturas(){
+  const input = $('pf-busca'); const dropdown = $('pf-dropdown');
+  if(!input || !dropdown) return;
+  const termo = _normalizaBusca(input.value);
+  if(!termo){ dropdown.classList.remove('open'); dropdown.innerHTML = ''; return; }
+  const matches = PREV_LISTA_COMPLETA.filter(v => {
+    const pfx = _normalizaBusca(v.prefixo);
+    const placa = _normalizaBusca(v.placa || '');
+    return pfx.indexOf(termo) !== -1 || placa.indexOf(termo) !== -1;
+  }).slice(0, 30);
+  if(matches.length === 0){
+    dropdown.innerHTML = '<div class="pf-dropdown-empty">Nenhuma viatura encontrada para "' + escapeHtml(input.value) + '"</div>';
+    dropdown.classList.add('open');
+    return;
+  }
+  dropdown.innerHTML = matches.map(v => {
+    const placaTxt = v.placa ? v.placa : '—';
+    const locTxt = v.locado ? ' · locada' : '';
+    return `<div class="pf-dropdown-item" data-prefixo="${escapeAttr(v.prefixo)}">
+      <span class="pf-di-prefix">${escapeHtml(v.prefixo)}${escapeHtml(locTxt)}</span>
+      <span class="pf-di-placa">${escapeHtml(placaTxt)}</span>
+    </div>`;
+  }).join('');
+  dropdown.classList.add('open');
+  dropdown.querySelectorAll('.pf-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const pfx = item.dataset.prefixo;
+      input.value = pfx;
+      selecionarViaturaPreventiva(pfx);
+      fecharDropdownViaturas();
+    });
+  });
+}
+function fecharDropdownViaturas(){
+  const dropdown = $('pf-dropdown');
+  if(dropdown) dropdown.classList.remove('open');
+}
+function _handlePfBuscaInput(){
+  const input = $('pf-busca'); if(!input) return;
+  const val = input.value.trim().toUpperCase();
+  const exato = PREV_LISTA_COMPLETA.find(v => v.prefixo.toUpperCase() === val);
+  if(exato){ selecionarViaturaPreventiva(exato.prefixo); fecharDropdownViaturas(); return; }
+  PREV_VIATURA_SELECIONADA = null;
+  $('pf-info').classList.remove('show');
+  $('pf-busca-dica').textContent = 'Digite para filtrar. Selecione uma viatura para continuar.';
+  renderDropdownViaturas();
 }
 
 // ─── Pneus ───
-let _viaturaSelecionadaPneu = null;
-function selecionarViaturaPneu(v){
-  _viaturaSelecionadaPneu = v;
-  $('pneus-busca').value = v.prefixo + ' — ' + (v.placa || '');
-  $('pneus-dropdown').classList.remove('open');
+let PREV_VIATURA_SELECIONADA_PNEU = null;
+function selecionarViaturaPneu(prefixo){
+  var v = PREV_LISTA_COMPLETA.find(function(x){ return x.prefixo === prefixo; });
+  if(!v) return;
+  PREV_VIATURA_SELECIONADA_PNEU = v;
   $('pneus-info').style.display = 'block';
   $('pneus-info-prefixo').textContent = v.prefixo;
   $('pneus-info-placa').textContent = v.placa || '—';
   $('pneus-busca-dica').textContent = 'Viatura selecionada.';
-  $('pneus-busca-dica').className = 'dica positivo';
   $('pneus-data').value = '';
   $('pneus-km').value = '';
   $('pneus-marca').value = '';
   $('pneus-os').value = '';
 }
-
 async function salvarPneusForm(){
-  const err = $('pneus-error'); err.style.display = 'none';
-  if(!_viaturaSelecionadaPneu){ err.textContent = 'Selecione uma viatura.'; err.style.display = 'block'; return; }
-  const data = $('pneus-data').value.trim();
-  const km = $('pneus-km').value.trim();
-  const marca = $('pneus-marca').value.trim();
-  const os = $('pneus-os').value.trim();
+  var err = $('pneus-error'); var btn = $('pneus-save');
+  err.style.display = 'none'; err.textContent = '';
+  if(!PREV_VIATURA_SELECIONADA_PNEU){ err.textContent = 'Selecione uma viatura primeiro.'; err.style.display = 'block'; return; }
+  var data = $('pneus-data').value;
+  var km = $('pneus-km').value.trim();
+  var marca = $('pneus-marca').value.trim();
+  var os = $('pneus-os').value.trim();
   if(!data && !km && !marca && !os){ err.textContent = 'Preencha ao menos um campo.'; err.style.display = 'block'; return; }
-  const btn = $('pneus-save'); btn.disabled = true; btn.textContent = 'Salvando…';
-  const payload = {
-    prefixo: _viaturaSelecionadaPneu.prefixo,
-    data: data || null,
+  
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  var payload = {
+    prefixo: PREV_VIATURA_SELECIONADA_PNEU.prefixo,
+    data: data ? _fmtDataISOparaBR(data) : null,
     km: km || null,
     marca: marca || null,
     os: os || null
   };
-  const r = await apiPrev('salvarPneus', payload);
-  btn.disabled = false; btn.textContent = 'Salvar';
-  if(!r.ok){ err.textContent = r.error || 'Falha ao salvar pneus.'; err.style.display = 'block'; return; }
-  try{ sessionStorage.removeItem('deman_cache_preventiva_v2'); }catch(e){}
-  await loadDataPreventiva();
-  $('pneus-cancel').click();
-  alert('Dados de pneus salvos com sucesso!');
+  
+  let r;
+  try {
+    r = await apiPrev('salvarPneus', payload);
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar';
+  }
+  
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
+  
+  PREV_VIATURA_SELECIONADA_PNEU = null;
+  $('pneus-busca').value = '';
+  $('pneus-info').style.display = 'none';
+  $('pneus-busca-dica').textContent = 'Selecione uma viatura para continuar.';
+  $('pneus-data').value = ''; $('pneus-km').value = ''; $('pneus-marca').value = ''; $('pneus-os').value = '';
+  
+  try{ sessionStorage.removeItem(STORAGE_KEY_PREV); }catch(e){}
+  await Promise.all([loadListaCompletaPreventiva(), loadDataPreventiva()]);
+  mostrarSucesso({ titulo: 'Pneus registrados!', sub: 'Viatura: ' + payload.prefixo, resumo: [['KM', payload.km], ['Data', payload.data], ['OS', payload.os]], mensagemWhats: '' });
+}
+function renderDropdownPneus(){
+  const input = $('pneus-busca'); const dropdown = $('pneus-dropdown');
+  if(!input || !dropdown) return;
+  const termo = _normalizaBusca(input.value);
+  if(!termo){ dropdown.classList.remove('open'); dropdown.innerHTML = ''; return; }
+  const matches = PREV_LISTA_COMPLETA.filter(v => {
+    const pfx = _normalizaBusca(v.prefixo);
+    const placa = _normalizaBusca(v.placa || '');
+    return pfx.indexOf(termo) !== -1 || placa.indexOf(termo) !== -1;
+  }).slice(0, 30);
+  if(matches.length === 0){
+    dropdown.innerHTML = '<div class="pf-dropdown-empty">Nenhuma viatura encontrada para "' + escapeHtml(input.value) + '"</div>';
+    dropdown.classList.add('open');
+    return;
+  }
+  dropdown.innerHTML = matches.map(v => `
+    <div class="pf-dropdown-item" data-prefixo="${escapeAttr(v.prefixo)}">
+      <span class="pf-di-prefix">${escapeHtml(v.prefixo)}</span>
+      <span class="pf-di-placa">${escapeHtml(v.placa || '—')}</span>
+    </div>`).join('');
+  dropdown.classList.add('open');
+  dropdown.querySelectorAll('.pf-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const pfx = item.dataset.prefixo;
+      input.value = pfx;
+      selecionarViaturaPneu(pfx);
+      dropdown.classList.remove('open');
+    });
+  });
 }
 
 // ─── Relatório Preventiva ───
-function prevRepPopularPrevisao(){
-  const set = new Set();
-  PREV_VIATURAS.forEach(v => {
-    const sit = calcularSituacaoOleo(v);
-    if(sit === 'vermelho') set.add('__vencidas__');
-    if(v.kmAtual && v.kmTroca){
-      const restante = (v.kmTroca || 0) + 10000 - (v.kmAtual || 0);
-      if(restante > 0 && restante < 5000) set.add('__proximas__');
+let prevRepFiltroOleo = '';
+let prevRepFiltroPrevisao = '';
+let prevRepFiltroKm = '';
+let prevRepFiltroBusca = '';
+function calcularPrevisaoTroca(v){
+  if(v.falta != null && v.falta <= 0){ return { data: new Date(), vencida: true, origem: 'atrasada' }; }
+  if(v.proximaTroca){
+    const d = parseDataBR(v.proximaTroca);
+    if(d && d.getFullYear() >= 2020){ return { data: d, vencida: false, origem: 'planilha' }; }
+  }
+  if(v.kmAtual != null && v.kmProxima != null && v.falta != null && v.falta > 0){
+    let kmPorMes = 1500;
+    if(v.ultimaTroca && v.kmUltima != null && v.kmUltima < v.kmAtual){
+      const dtUltima = parseDataBR(v.ultimaTroca);
+      if(dtUltima && dtUltima.getTime() < Date.now()){
+        const meses = Math.max(0.5, (Date.now() - dtUltima.getTime()) / (30 * 86400000));
+        const kmRodados = v.kmAtual - v.kmUltima;
+        if(kmRodados > 100) kmPorMes = kmRodados / meses;
+      }
     }
-  });
-  const sel = $('prevRepFilterPrevisao');
-  sel.innerHTML = '<option value="">Todas</option>' +
-    (set.has('__vencidas__') ? '<option value="__vencidas__">Vencidas</option>' : '') +
-    (set.has('__proximas__') ? '<option value="__proximas__">Próximas (até 5.000 km)</option>' : '');
+    if(kmPorMes > 0 && isFinite(kmPorMes)){
+      const mesesAte = Math.min(120, v.falta / kmPorMes);
+      const previsao = new Date();
+      previsao.setDate(previsao.getDate() + Math.round(mesesAte * 30));
+      return { data: previsao, vencida: false, origem: 'estimada' };
+    }
+  }
+  return null;
 }
-
-function prevRepAplicarFiltros(){
-  return PREV_VIATURAS.filter(v => {
-    const sit = calcularSituacaoOleo(v);
-    if(prevRepFiltroOleo && sit !== prevRepFiltroOleo) return false;
+function prevRepPopularPrevisao(lista){
+  const meses = new Set();
+  let temVencidas = false;
+  lista.forEach(v => {
+    const p = calcularPrevisaoTroca(v);
+    if(!p) return;
+    if(p.vencida){ temVencidas = true; return; }
+    meses.add(p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0'));
+  });
+  const sel = $('prevRepFilterPrevisao'); if(!sel) return;
+  const mesesOrd = Array.from(meses).sort();
+  let html = '<option value="">Todas</option>';
+  if(temVencidas) html += '<option value="__vencidas__">⚠ Vencidas (atrasadas)</option>';
+  html += mesesOrd.map(ym => {
+    const selAttr = (prevRepFiltroPrevisao === ym) ? ' selected' : '';
+    return `<option value="${escapeAttr(ym)}"${selAttr}>${escapeHtml(formatarMesAno(ym))}</option>`;
+  }).join('');
+  sel.innerHTML = html;
+  sel.value = prevRepFiltroPrevisao;
+}
+function prevRepAplicarFiltros(lista){
+  return lista.filter(v => {
+    if(prevRepFiltroOleo && v.statusOleo !== prevRepFiltroOleo) return false;
     if(prevRepFiltroPrevisao){
-      const restante = (v.kmAtual && v.kmTroca) ? ((v.kmTroca || 0) + 10000 - (v.kmAtual || 0)) : null;
-      if(prevRepFiltroPrevisao === '__vencidas__' && sit !== 'vermelho') return false;
-      if(prevRepFiltroPrevisao === '__proximas__' && !(restante !== null && restante > 0 && restante < 5000)) return false;
+      const p = calcularPrevisaoTroca(v);
+      if(prevRepFiltroPrevisao === '__vencidas__'){
+        if(!p || !p.vencida) return false;
+      } else {
+        if(!p || p.vencida) return false;
+        const ym = p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0');
+        if(ym !== prevRepFiltroPrevisao) return false;
+      }
     }
     if(prevRepFiltroKm){
-      const restante = (v.kmAtual && v.kmTroca) ? ((v.kmTroca || 0) + 10000 - (v.kmAtual || 0)) : null;
-      if(prevRepFiltroKm === 'atrasado' && !(restante !== null && restante <= 0)) return false;
-      if(prevRepFiltroKm === 'curto' && !(restante !== null && restante > 0 && restante <= 2000)) return false;
-      if(prevRepFiltroKm === 'medio' && !(restante !== null && restante > 2000 && restante <= 5000)) return false;
-      if(prevRepFiltroKm === 'longo' && !(restante !== null && restante > 5000)) return false;
-      if(prevRepFiltroKm === 'sem_dados' && !(restante === null)) return false;
+      if(prevRepFiltroKm === 'sem_dados'){
+        if(v.kmAtual != null && v.kmProxima != null) return false;
+      } else {
+        if(v.falta == null || v.kmAtual == null || v.kmProxima == null) return false;
+        if(prevRepFiltroKm === 'atrasado' && v.falta > 0) return false;
+        if(prevRepFiltroKm === 'curto' && (v.falta <= 0 || v.falta > 2000)) return false;
+        if(prevRepFiltroKm === 'medio' && (v.falta <= 2000 || v.falta > 5000)) return false;
+        if(prevRepFiltroKm === 'longo' && v.falta <= 5000) return false;
+      }
     }
     if(prevRepFiltroBusca){
       const q = normalizeStr(prevRepFiltroBusca);
@@ -3730,56 +3672,102 @@ function prevRepAplicarFiltros(){
     return true;
   });
 }
-
-function prevRepRenderKpis(dados){
-  const total = dados.length;
-  const verm = dados.filter(v => calcularSituacaoOleo(v) === 'vermelho').length;
-  const ama = dados.filter(v => calcularSituacaoOleo(v) === 'amarelo').length;
-  const vde = dados.filter(v => calcularSituacaoOleo(v) === 'verde').length;
+function prevRepRenderKpis(lista){
+  const total = lista.length;
+  const atrasadas = lista.filter(v => v.statusOleo === 'vermelho').length;
+  const proximas = lista.filter(v => v.statusOleo === 'amarelo').length;
+  const emDia = lista.filter(v => v.statusOleo === 'verde').length;
+  const semDados = lista.filter(v => v.statusOleo === 'vazio').length;
+  const semPrevisao = lista.filter(v => !calcularPrevisaoTroca(v)).length;
   $('prevReportKpis').innerHTML = `
     <div class="report-kpi kpi-total"><div class="kpi-label">Total</div><div class="kpi-value">${total}</div></div>
-    <div class="report-kpi kpi-pend"><div class="kpi-label">🔴 Atrasadas</div><div class="kpi-value">${verm}</div></div>
-    <div class="report-kpi kpi-aprov"><div class="kpi-label">🟡 Próximas</div><div class="kpi-value">${ama}</div></div>
-    <div class="report-kpi kpi-final"><div class="kpi-label">🟢 Em dia</div><div class="kpi-value">${vde}</div></div>
+    <div class="report-kpi kpi-pend"><div class="kpi-label">🔴 Atrasadas</div><div class="kpi-value" style="color:var(--vermelho);">${atrasadas}</div></div>
+    <div class="report-kpi kpi-qnt"><div class="kpi-label">🟡 Próximas</div><div class="kpi-value" style="color:var(--amber);">${proximas}</div></div>
+    <div class="report-kpi kpi-final"><div class="kpi-label">🟢 Em dia</div><div class="kpi-value" style="color:var(--verde);">${emDia}</div></div>
+    <div class="report-kpi kpi-aprov"><div class="kpi-label">— Sem dados</div><div class="kpi-value" style="color:var(--text-faint);">${semDados}</div></div>
+    <div class="report-kpi kpi-dist"><div class="kpi-label">Sem previsão</div><div class="kpi-value">${semPrevisao}</div></div>
   `;
 }
-
 function prevRepRenderTabela(){
-  const dados = prevRepAplicarFiltros();
+  const base = PREV_VIATURAS.slice();
+  const dados = prevRepAplicarFiltros(base);
   prevRepRenderKpis(dados);
-  const filtros = [];
-  if(prevRepFiltroOleo) filtros.push('Estado: ' + prevRepFiltroOleo);
-  if(prevRepFiltroPrevisao) filtros.push('Previsão: ' + prevRepFiltroPrevisao);
-  if(prevRepFiltroKm) filtros.push('KM: ' + prevRepFiltroKm);
-  if(prevRepFiltroBusca) filtros.push('Busca: ' + prevRepFiltroBusca);
-  $('prevRepFilterResumo').innerHTML = '<b>Total:</b> ' + dados.length + ' de ' + PREV_VIATURAS.length + (filtros.length ? ' · <b>Filtros:</b> ' + filtros.join(' · ') : '');
-  const labels = { vermelho:'🔴 Atrasada', amarelo:'🟡 Próxima', verde:'🟢 Em dia', vazio:'— Sem dados' };
-  const ordenado = dados.slice().sort((a,b) => a.prefixo.localeCompare(b.prefixo));
+  const partes = [];
+  if(prevRepFiltroOleo){
+    const labels = { vermelho: 'Atrasadas', amarelo: 'Próximas', verde: 'Em dia', vazio: 'Sem dados' };
+    partes.push('Situação: ' + labels[prevRepFiltroOleo]);
+  }
+  if(prevRepFiltroPrevisao){
+    if(prevRepFiltroPrevisao === '__vencidas__') partes.push('Previsão: Vencidas');
+    else partes.push('Previsão: ' + formatarMesAno(prevRepFiltroPrevisao));
+  }
+  if(prevRepFiltroKm){
+    const labels = { atrasado: 'Atrasado', curto: '0–2.000', medio: '2.000–5.000', longo: '>5.000', sem_dados: 'Sem dados' };
+    partes.push('KM: ' + labels[prevRepFiltroKm]);
+  }
+  if(prevRepFiltroBusca) partes.push('Busca: "' + prevRepFiltroBusca + '"');
+  $('prevRepFilterResumo').innerHTML =
+    '<b>Filtros:</b> ' + (partes.length ? partes.map(escapeHtml).join(' · ') : 'nenhum') +
+    ' · <b>Exibindo:</b> ' + dados.length + ' de ' + base.length + ' viaturas';
+  const ordenado = dados.slice().sort((a, b) => {
+    const pa = calcularPrevisaoTroca(a); const pb = calcularPrevisaoTroca(b);
+    const ta = pa ? pa.data.getTime() : Infinity; const tb = pb ? pb.data.getTime() : Infinity;
+    if(ta !== tb) return ta - tb;
+    return a.prefixo.localeCompare(b.prefixo);
+  });
+  const hoje = new Date();
   $('prevReportBody').innerHTML = ordenado.length === 0
-    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhum registro encontrado</td></tr>'
+    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhuma viatura encontrada com os filtros atuais</td></tr>'
     : ordenado.map(v => {
-        const sit = calcularSituacaoOleo(v);
-        const restante = (v.kmAtual && v.kmTroca) ? ((v.kmTroca || 0) + 10000 - (v.kmAtual || 0)) : null;
-        const previsao = restante === null ? '—' : (restante <= 0 ? 'Vencida' : (restante < 2000 ? 'Até 2 mil km' : (restante < 5000 ? 'Até 5 mil km' : '> 5 mil km')));
+        const p = calcularPrevisaoTroca(v);
+        let prevTxt = '—'; let prevCor = 'var(--text-faint)';
+        if(p){
+          if(p.vencida){ prevTxt = '⚠ VENCIDA'; prevCor = 'var(--vermelho)'; }
+          else {
+            prevTxt = p.data.toLocaleDateString('pt-BR');
+            if(p.origem === 'estimada') prevTxt += ' (est.)';
+            prevCor = p.data < new Date(hoje.getTime() + 30*86400000) ? 'var(--amber)' : 'var(--text)';
+          }
+        }
+        const faltaTxt = v.falta != null
+          ? (v.falta <= 0 ? '+' + Math.abs(v.falta).toLocaleString('pt-BR') + ' passou' : v.falta.toLocaleString('pt-BR') + ' km')
+          : '—';
+        const faltaCor = v.falta != null && v.falta <= 0 ? 'var(--vermelho)' : (v.falta != null && v.falta <= 2000 ? 'var(--amber)' : 'var(--text-dim)');
+        const statusOleoLabel = { vermelho: '🔴 Atrasada', amarelo: '🟡 Próxima', verde: '🟢 Em dia', vazio: '— Sem dados' }[v.statusOleo] || '—';
+        const statusOleoCor = { vermelho: 'var(--vermelho)', amarelo: 'var(--amber)', verde: 'var(--verde)' }[v.statusOleo] || 'var(--text-faint)';
         return `<tr>
           <td class="v">${escapeHtml(v.prefixo)}</td>
-          <td class="info">${escapeHtml(v.placa || '—')}</td>
-          <td>${escapeHtml(v.situacao || '—')}</td>
-          <td class="dias">${v.kmAtual ? Number(v.kmAtual).toLocaleString('pt-BR') : '—'}</td>
-          <td class="dias">${v.kmTroca ? Number((v.kmTroca||0)+10000).toLocaleString('pt-BR') : '—'}</td>
-          <td class="dias ${restante !== null && restante < 0 ? '' : 'vazio'}">${restante !== null ? Number(restante).toLocaleString('pt-BR') : '—'}</td>
-          <td>${escapeHtml(previsao)}</td>
-          <td class="status">${labels[sit]}</td>
-          <td>${v.osTroca ? escapeHtml(v.osTroca) : '—'}</td>
+          <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${escapeHtml(v.placa || '—')}</td>
+          <td style="font-size:11px;color:var(--text-dim);">${escapeHtml(v.situacao || '—')}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${v.kmAtual != null ? v.kmAtual.toLocaleString('pt-BR') : '—'}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${v.kmProxima != null ? v.kmProxima.toLocaleString('pt-BR') : '—'}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:${faltaCor};">${faltaTxt}</td>
+          <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${prevCor};">${prevTxt}</td>
+          <td style="font-size:11px;color:${statusOleoCor};">${statusOleoLabel}</td>
+          <td style="font-size:11px;color:var(--text-dim);">${escapeHtml(formatarGarantiaPrev(v.garantia) || '—')}</td>
         </tr>`;
       }).join('');
 }
-
 function abrirRelatorioPreventiva(){
+  if(!PREV_VIATURAS.length){ alert('Carregando dados… Aguarde um instante e tente novamente.'); loadDataPreventiva(); return; }
   prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
-  prevRepPopularPrevisao();
+  $('prevRepFilterOleo').value = ''; $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = '';
+  prevRepPopularPrevisao(PREV_VIATURAS);
   const agora = new Date();
   $('prevReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
+  const selOleo = $('prevRepFilterOleo'); const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
+  if(selOleo && !selOleo.dataset.bound){ selOleo.dataset.bound = '1'; selOleo.addEventListener('change', () => { prevRepFiltroOleo = selOleo.value; prevRepRenderTabela(); }); }
+  if(selPrev && !selPrev.dataset.bound){ selPrev.dataset.bound = '1'; selPrev.addEventListener('change', () => { prevRepFiltroPrevisao = selPrev.value; prevRepRenderTabela(); }); }
+  if(selKm && !selKm.dataset.bound){ selKm.dataset.bound = '1'; selKm.addEventListener('change', () => { prevRepFiltroKm = selKm.value; prevRepRenderTabela(); }); }
+  if(inpBusca && !inpBusca.dataset.bound){ inpBusca.dataset.bound = '1'; inpBusca.addEventListener('input', debounce(() => { prevRepFiltroBusca = inpBusca.value; prevRepRenderTabela(); }, 180)); }
+  if(btnLimpar && !btnLimpar.dataset.bound){
+    btnLimpar.dataset.bound = '1';
+    btnLimpar.addEventListener('click', () => {
+      prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
+      selOleo.value = ''; selPrev.value = ''; selKm.value = ''; inpBusca.value = '';
+      prevRepRenderTabela();
+    });
+  }
   prevRepRenderTabela();
   _abrirReportModal('prevReportModal');
 }
@@ -3788,7 +3776,6 @@ function abrirRelatorioPreventiva(){
 // BINDINGS
 // ═══════════════════════════════════════════════════════════════════════════
 function bindTudo(){
-  // Menu / sidebar
   $('menuToggle').addEventListener('click', () => {
     if(isMobile()) $('app').classList.toggle('sidebar-open');
     else $('app').classList.toggle('sidebar-collapsed');
@@ -3881,52 +3868,48 @@ function bindTudo(){
   $('viatClearFilterBtn').addEventListener('click', () => { activeFilter = 'todas'; $('viatSearch').value = ''; renderViaturas(); });
 
   // Preventiva — painel
-  $('prevFiltroSituacao').addEventListener('change', e => { prevFiltroSituacao = e.target.value; renderPreventiva(); });
-  $('prevFiltroOleo').addEventListener('change', e => { prevFiltroOleo = e.target.value; renderPreventiva(); });
-  $('prevSearch').addEventListener('input', debounce(e => { prevFiltroTexto = e.target.value; renderPreventiva(); }, 250));
+  $('prevFiltroSituacao').addEventListener('change', e => { PREV_FILTRO_SITUACAO = e.target.value; renderPreventiva(); });
+  $('prevFiltroOleo').addEventListener('change', e => { PREV_FILTRO_OLEO = e.target.value; renderPreventiva(); });
+  $('prevSearch').addEventListener('input', debounce(renderPreventiva, 180));
   $('prevClearFilterBtn').addEventListener('click', () => {
-    prevFiltroSituacao = ''; prevFiltroOleo = ''; prevFiltroTexto = '';
+    PREV_FILTRO_SITUACAO = ''; PREV_FILTRO_OLEO = '';
     $('prevFiltroSituacao').value = ''; $('prevFiltroOleo').value = ''; $('prevSearch').value = '';
     renderPreventiva();
   });
-  $('prevReportBtn').addEventListener('click', abrirRelatorioPreventiva);
+  $('prevReportBtn').addEventListener('click', () => { if(!temPermissao('ver_preventiva')){ alert('Sem permissão.'); return; } abrirRelatorioPreventiva(); });
 
   // Preventiva — atualizar
-  $('pf-busca').addEventListener('input', debounce(e => renderDropdownGenerico('pf', e.target.value, selecionarViaturaPrev), 150));
-  $('pf-cancel').addEventListener('click', () => {
-    _viaturaSelecionadaPrev = null;
-    $('pf-busca').value = ''; $('pf-km').value = ''; $('pf-data').value = ''; $('pf-kmtroca').value = ''; $('pf-os').value = '';
-    $('pf-info').classList.remove('show');
-    $('pf-busca-dica').textContent = 'Digite para filtrar. Selecione uma viatura para continuar.';
-    $('pf-busca-dica').className = 'dica';
-    $('pf-error').style.display = 'none';
-  });
+  $('pf-busca').addEventListener('input', debounce(_handlePfBuscaInput, 120));
+  $('pf-busca').addEventListener('focus', () => { if($('pf-busca').value.trim()) renderDropdownViaturas(); });
+  $('pf-km').addEventListener('input', atualizarDicaKm);
+  $('pf-cancel').addEventListener('click', () => { limparFormularioPreventiva(); showPrevTab('painel'); });
   $('pf-save').addEventListener('click', salvarPreventivaForm);
+  
+  document.addEventListener('click', e => {
+    const wrap = $('pf-busca-wrap'); if(!wrap) return;
+    if(!wrap.contains(e.target)) fecharDropdownViaturas();
+  });
 
   // Preventiva — pneus
-  $('pneus-busca').addEventListener('input', debounce(e => renderDropdownGenerico('pneus', e.target.value, selecionarViaturaPneu), 150));
-  $('pneus-cancel').addEventListener('click', () => {
-    _viaturaSelecionadaPneu = null;
-    $('pneus-busca').value = ''; $('pneus-data').value = ''; $('pneus-km').value = ''; $('pneus-marca').value = ''; $('pneus-os').value = '';
-    $('pneus-info').style.display = 'none';
-    $('pneus-busca-dica').textContent = 'Selecione uma viatura para continuar.';
-    $('pneus-busca-dica').className = 'dica';
-    $('pneus-error').style.display = 'none';
+  $('pneus-busca').addEventListener('input', debounce(renderDropdownPneus, 120));
+  $('pneus-busca').addEventListener('focus', () => { if($('pneus-busca').value.trim()) renderDropdownPneus(); });
+  $('pneus-cancel').addEventListener('click', () => { 
+    PREV_VIATURA_SELECIONADA_PNEU = null;
+    $('pneus-busca').value = ''; $('pneus-info').style.display = 'none'; 
+    $('pneus-busca-dica').textContent = 'Selecione uma viatura para continuar.'; 
+    showPrevTab('painel'); 
   });
   $('pneus-save').addEventListener('click', salvarPneusForm);
+  
+  document.addEventListener('click', e => {
+    const wrap = $('pneus-busca-wrap'); if(!wrap) return;
+    if(!wrap.contains(e.target)) $('pneus-dropdown').classList.remove('open');
+  });
 
   // Preventiva — relatório
   $('prevReportClose').addEventListener('click', () => _fecharReportModal('prevReportModal'));
   $('prevReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioPreventiva()));
-  $('prevRepFilterOleo').addEventListener('change', e => { prevRepFiltroOleo = e.target.value; prevRepRenderTabela(); });
-  $('prevRepFilterPrevisao').addEventListener('change', e => { prevRepFiltroPrevisao = e.target.value; prevRepRenderTabela(); });
-  $('prevRepFilterKm').addEventListener('change', e => { prevRepFiltroKm = e.target.value; prevRepRenderTabela(); });
-  $('prevRepFilterBusca').addEventListener('input', debounce(e => { prevRepFiltroBusca = e.target.value; prevRepRenderTabela(); }, 200));
-  $('prevRepFilterLimpar').addEventListener('click', () => {
-    prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
-    $('prevRepFilterOleo').value = ''; $('prevRepFilterPrevisao').value = ''; $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = '';
-    prevRepRenderTabela();
-  });
+  $('prevReportModal').addEventListener('click', e => { if(e.target.id === 'prevReportModal') _fecharReportModal('prevReportModal'); });
 
   // Manutenção — filtros e busca
   $('manutSearch').addEventListener('input', debounce(() => { if(activeView === 'manutencao') renderManut(); }, 250));
@@ -3986,15 +3969,6 @@ function bindTudo(){
   });
   $('cp-save').addEventListener('click', salvarNovaSenha);
   $('changePassModal').addEventListener('click', e => { if(e.target.id === 'changePassModal' && modoTrocaSenha === 'voluntario') $('changePassModal').style.display = 'none'; });
-
-  // Fechar dropdowns ao clicar fora
-  document.addEventListener('click', e => {
-    ['pf', 'pneus'].forEach(p => {
-      const wrap = $(p + '-busca-wrap');
-      const drop = $(p + '-dropdown');
-      if(wrap && drop && !wrap.contains(e.target)) drop.classList.remove('open');
-    });
-  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -4054,14 +4028,14 @@ async function startApp(){
   aplicarPermissoesUI();
   bindTudo();
   await syncInternetTime();
-  // Carrega dados iniciais em paralelo
   loadDataOS();
   if(temPermissao('ver_viaturas')) loadDataViaturas();
   if(temPermissao('ver_manutencao')) loadDataManut();
-  if(temPermissao('ver_preventiva')) loadDataPreventiva();
-  // Tela inicial
+  if(temPermissao('ver_preventiva')){
+    loadDataPreventiva();
+    if(temPermissao('prev_editar_km')) loadListaCompletaPreventiva();
+  }
   showView('home');
-  // Polling
   setInterval(() => {
     if(document.hidden || !isLoggedIn()) return;
     if(temPermissao('ver_os')) loadDataOS();
@@ -4090,4 +4064,3 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
-     
