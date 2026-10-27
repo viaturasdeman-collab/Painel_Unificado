@@ -3177,16 +3177,22 @@ async function salvarFormManut(){
       showManutTab('registros');
     } else if(modoManutForm === 'evento'){
       if(!processoAtual) throw new Error('Processo não carregado.');
+      
+      // ⬇️ AQUI ESTÁ A CORREÇÃO ⬇️
       const payload = {
         id: processoAtual.id,
         evento: $('me-tipo').value,
+        tipo: $('me-tipo').value,        // Adicionado para o backend
+        tipoEvento: $('me-tipo').value,  // Adicionado para o backend
         data: $('me-data').value,
+        dataEvento: $('me-data').value,  // Adicionado para o backend
         status: $('me-status').value || '',
         local: lerLocalForm('me-local-wrap'),
         solicitante: $('me-solicitante').value.trim(),
         informante: $('me-informante').value.trim(),
         detalhes: $('me-detalhes').value.trim()
       };
+      
       if(!payload.data) throw new Error('Informe a data do evento.');
       const r = await apiManut('adicionarEvento', payload);
       if(!r.ok) throw new Error(r.error || 'Falha ao adicionar evento.');
@@ -3195,23 +3201,6 @@ async function salvarFormManut(){
       try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
       await loadDataManut();
       mostrarSucesso(processoAtual, 'evento');
-      showManutTab('registros');
-    } else if(modoManutForm === 'finalizar'){
-      if(!processoAtual) throw new Error('Processo não carregado.');
-      const payload = {
-        id: processoAtual.id,
-        data: $('mf-data').value,
-        status: $('mf-status').value,
-        local: lerLocalForm('mf-local-wrap'),
-        informante: $('mf-informante').value.trim(),
-        detalhes: $('mf-detalhes').value.trim()
-      };
-      if(!payload.data) throw new Error('Informe a data final.');
-      const r = await apiManut('finalizarProcesso', payload);
-      if(!r.ok) throw new Error(r.error || 'Falha ao finalizar.');
-      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
-      await loadDataManut();
-      mostrarSucesso(processoAtual, 'finalizar');
       showManutTab('registros');
     }
   }catch(e){
