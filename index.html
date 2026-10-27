@@ -3477,17 +3477,44 @@ function renderPrevCards(){
     if(q && !normalizeStr(v.prefixo).includes(q) && !normalizeStr(v.placa).includes(q)) return false;
     return true;
   });
+  
   if(lista.length === 0){
     $('prevContent').innerHTML = '<div class="prev-empty">Nenhuma viatura encontrada.</div>';
     return;
   }
+  
   lista.sort((a,b) => a.prefixo.localeCompare(b.prefixo));
+  
   $('prevContent').innerHTML = lista.map(v => {
     const sit = calcularSituacaoOleo(v);
-    const labels = { vermelho:'🔴 ATRASADA', amarelo:'🟡 PRÓXIMA', verde:'🟢 EM DIA', vazio:'— SEM DADOS' };
-    const diff = (v.kmAtual && v.kmTroca) ? ((v.kmTroca || 0) + 10000 - (v.kmAtual || 0)) : null;
-    const atraso = diff !== null && diff < 0;
-    return `<div class="prev-card ${sit}">
+    
+    // Lógica de cálculo baseada no print
+    const temDados = v.kmAtual && v.kmTroca;
+    const proxTroca = temDados ? (Number(v.kmTroca) + 10000) : null;
+    const diff = temDados ? (Number(v.kmAtual) - proxTroca) : null;
+    
+    // Configuração do visual da faixa inferior
+    let faixaClass = sit;
+    let faixaTexto = '— SEM DADOS';
+    let iconeFaixa = '';
+    
+    if (temDados) {
+      if (diff > 0) {
+        faixaTexto = `PASSOU ${diff.toLocaleString('pt-BR')} km`;
+        iconeFaixa = `<span class="dot" style="background:var(--vermelho);"></span>`;
+      } else if (diff === 0) {
+        faixaTexto = `TROCA AGORA`;
+        iconeFaixa = `<span class="dot" style="background:var(--amarelo);"></span>`;
+      } else {
+        faixaTexto = `FALTAM ${Math.abs(diff).toLocaleString('pt-BR')} km`;
+        iconeFaixa = `<span class="dot" style="background:var(--verde);"></span>`;
+      }
+    }
+
+    // Formatação da garantia (se existir na sua planilha)
+    const txtGarantia = v.garantia ? `Garantia ${v.garantia}` : '—';
+
+    return `<div class="prev-card ${faixaClass}">
       <div class="prev-head">
         <div class="prev-titulo">
           <span class="prev-prefixo">${escapeHtml(v.prefixo)}</span>
@@ -3496,17 +3523,34 @@ function renderPrevCards(){
         <div class="prev-sub">
           <span>${escapeHtml(v.situacao || '—')}</span>
           <span class="sep">·</span>
-          <span>${escapeHtml(v.gbm || '—')}</span>
+          <span>${escapeHtml(txtGarantia)}</span>
         </div>
       </div>
+      
       <div class="prev-body">
-        <div class="prev-row"><span class="lbl">KM atual</span><span class="val">${v.kmAtual ? Number(v.kmAtual).toLocaleString('pt-BR') : '—'}</span></div>
-        <div class="prev-row"><span class="lbl">KM da troca</span><span class="val">${v.kmTroca ? Number(v.kmTroca).toLocaleString('pt-BR') : '—'}</span></div>
-        <div class="prev-row"><span class="lbl">Data da troca</span><span class="val">${escapeHtml(v.dataTroca || '—')}</span></div>
-        <div class="prev-row"><span class="lbl">OS da troca</span><span class="val">${escapeHtml(v.osTroca || '—')}</span></div>
-        <div class="prev-row"><span class="lbl">Falta</span><span class="val ${atraso?'atraso':''}">${diff !== null ? Number(diff).toLocaleString('pt-BR') + ' km' : '—'}</span></div>
+        <div class="prev-row">
+          <span class="lbl">KM atual</span>
+          <span class="val">${v.kmAtual ? Number(v.kmAtual).toLocaleString('pt-BR') : '—'}</span>
+        </div>
+        <div class="prev-row">
+          <span class="lbl">Próx. troca</span>
+          <span class="val ${diff > 0 ? 'atraso' : ''}">${proxTroca ? proxTroca.toLocaleString('pt-BR') : '—'}</span>
+        </div>
+        <div class="prev-row">
+          <span class="lbl">OS troca</span>
+          <span class="val">${escapeHtml(v.osTroca || '—')}</span>
+        </div>
+        
+        ${v.dataTroca ? `
+        <div class="prev-data">
+          <span style="background:var(--surface); border:1px solid var(--border); padding:2px 6px; border-radius:4px; font-size:10px; margin-right:4px;">📅</span> 
+          ${escapeHtml(v.dataTroca)}
+        </div>` : ''}
       </div>
-      <div class="prev-faixa ${sit}">${labels[sit]}</div>
+      
+      <div class="prev-faixa ${faixaClass}">
+        ${iconeFaixa} ${faixaTexto}
+      </div>
     </div>`;
   }).join('');
 }
