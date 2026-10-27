@@ -3458,16 +3458,14 @@ function renderPrevSummary(){
   const vermelho = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'vermelho').length;
   const amarelo = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'amarelo').length;
   const verde = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'verde').length;
-  const semDados = PREV_VIATURAS.filter(v => calcularSituacaoOleo(v) === 'vazio').length;
+
   $('prevSummary').innerHTML = `
-    <div class="summary-card total"><div class="label">Total</div><div class="value">${total}</div></div>
+    <div class="summary-card manut-total"><div class="label">Total</div><div class="value">${total}</div></div>
     <div class="summary-card manut-dias"><div class="label">🔴 Atrasadas</div><div class="value">${vermelho}</div></div>
     <div class="summary-card manut-abertos"><div class="label">🟡 Próximas</div><div class="value">${amarelo}</div></div>
     <div class="summary-card manut-fechados"><div class="label">🟢 Em dia</div><div class="value">${verde}</div></div>
-    <div class="summary-card"><div class="label">— Sem dados</div><div class="value">${semDados}</div></div>
   `;
 }
-
 function renderPrevCards(){
   const q = normalizeStr(prevFiltroTexto);
   let lista = PREV_VIATURAS.filter(v => {
