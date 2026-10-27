@@ -3446,8 +3446,9 @@ async function loadDataPreventiva(){
 }
 
 function calcularSituacaoOleo(v){
-  if(!v.kmAtual || !v.kmTroca) return 'vazio';
-  const diff = (v.kmTroca || 0) + 10000 - (v.kmAtual || 0);
+  if (v.statusOleo) return v.statusOleo;
+  if(!v.kmAtual || !v.kmProxima) return 'vazio';
+  const diff = (v.kmProxima || 0) - (v.kmAtual || 0);
   if(diff <= 0) return 'vermelho';
   if(diff <= 2000) return 'amarelo';
   return 'verde';
@@ -3488,31 +3489,28 @@ function renderPrevCards(){
   $('prevContent').innerHTML = lista.map(v => {
     const sit = calcularSituacaoOleo(v);
     
-    // Lógica de cálculo baseada no print
-    const temDados = v.kmAtual && v.kmTroca;
-    const proxTroca = temDados ? (Number(v.kmTroca) + 10000) : null;
-    const diff = temDados ? (Number(v.kmAtual) - proxTroca) : null;
+    // Pega os dados exatos calculados pelo backend
+    const proxTroca = v.kmProxima;
+    const falta = v.falta; // Se for negativo, passou. Se positivo, ainda falta.
     
     // Configuração do visual da faixa inferior
     let faixaClass = sit;
     let faixaTexto = '— SEM DADOS';
     let iconeFaixa = '';
     
-    if (temDados) {
-      if (diff > 0) {
-        faixaTexto = `PASSOU ${diff.toLocaleString('pt-BR')} km`;
+    if (sit !== 'vazio' && falta != null) {
+      if (falta <= 0) {
+        faixaTexto = `PASSOU ${Math.abs(falta).toLocaleString('pt-BR')} km`;
         iconeFaixa = `<span class="dot" style="background:var(--vermelho);"></span>`;
-      } else if (diff === 0) {
-        faixaTexto = `TROCA AGORA`;
-        iconeFaixa = `<span class="dot" style="background:var(--amarelo);"></span>`;
       } else {
-        faixaTexto = `FALTAM ${Math.abs(diff).toLocaleString('pt-BR')} km`;
+        faixaTexto = `FALTAM ${falta.toLocaleString('pt-BR')} km`;
         iconeFaixa = `<span class="dot" style="background:var(--verde);"></span>`;
       }
     }
 
-    // Formatação da garantia (se existir na sua planilha)
+    // Formatação da garantia
     const txtGarantia = v.garantia ? `Garantia ${v.garantia}` : '—';
+    const atrasoKm = (falta != null && falta <= 0);
 
     return `<div class="prev-card ${faixaClass}">
       <div class="prev-head">
@@ -3534,17 +3532,17 @@ function renderPrevCards(){
         </div>
         <div class="prev-row">
           <span class="lbl">Próx. troca</span>
-          <span class="val ${diff > 0 ? 'atraso' : ''}">${proxTroca ? proxTroca.toLocaleString('pt-BR') : '—'}</span>
+          <span class="val ${atrasoKm ? 'atraso' : ''}">${proxTroca ? Number(proxTroca).toLocaleString('pt-BR') : '—'}</span>
         </div>
         <div class="prev-row">
           <span class="lbl">OS troca</span>
           <span class="val">${escapeHtml(v.osTroca || '—')}</span>
         </div>
         
-        ${v.dataTroca ? `
+        ${v.proximaTroca ? `
         <div class="prev-data">
           <span style="background:var(--surface); border:1px solid var(--border); padding:2px 6px; border-radius:4px; font-size:10px; margin-right:4px;">📅</span> 
-          ${escapeHtml(v.dataTroca)}
+          ${escapeHtml(v.proximaTroca)}
         </div>` : ''}
       </div>
       
