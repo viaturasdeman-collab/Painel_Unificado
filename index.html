@@ -1337,7 +1337,7 @@ const PERM_GRUPOS = {
 };
 
 const LOCAIS_OFICINA = [
-  'FIX CAR','SAMAN PNEUS','AUTO MIX','VIDROCAR','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
+  'FIX CAR','AUTO MIX','VIDROCAR','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
   'MULTIRADIUS','RENOBAN','XINGO','PAULISTA','LEANDRO TRUCK','CAXANGA',
   'M. SOBRAL','ARIBE MOTOS','AC MOTOS',
   'SR. AROLDO','MARDISA','MORAUTO','SANVEL',
@@ -1471,9 +1471,6 @@ function _fecharReportModal(id){
   document.body.classList.remove('relatorio-aberto');
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Impressão com nome de arquivo personalizado + filtros ativos
-// ─────────────────────────────────────────────────────────────────────────
 function imprimirComTitulo(nomeBase){
   const seguro = String(nomeBase || 'Relatório')
     .replace(/[\\/:*?"<>|]/g, '-')
@@ -1499,9 +1496,6 @@ function imprimirComTitulo(nomeBase){
   setTimeout(() => window.print(), 50);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Nome dinâmico por relatório — lê os filtros ativos no momento do clique
-// ─────────────────────────────────────────────────────────────────────────
 function _nomeRelatorioOS(){
   const filtros = [];
 
@@ -2506,6 +2500,16 @@ function _htmlInputLocal(idCampo, valorAtual){
   return `<input type="text" id="${idCampo}" value="${escapeAttr(valorAtual||'')}" placeholder="Ex.: Fix Car, Vidrocar, Arcom…" autocomplete="off" autocapitalize="characters">
     <span class="local-hint">Texto livre.</span>`;
 }
+function _htmlInputLocalComLista(idCampo, valorAtual, listaSugestoes){
+  const idLista = 'dl-' + idCampo;
+  const lista = (listaSugestoes || []).filter(Boolean);
+  const datalist = lista.length
+    ? `<datalist id="${idLista}">${lista.map(l => `<option value="${escapeAttr(l)}"></option>`).join('')}</datalist>`
+    : '';
+  return `<input type="text" id="${idCampo}" value="${escapeAttr(valorAtual||'')}" list="${idLista}" placeholder="Digite ou escolha da lista…" autocomplete="off" autocapitalize="characters">
+    ${datalist}
+    <span class="local-hint">Você pode digitar livremente ou escolher uma oficina/unidade.</span>`;
+}
 function _htmlSelectLocal(idCampo, valorAtual){
   const vAtual = String(valorAtual||'').trim().toUpperCase();
   function opt(l){
@@ -2535,7 +2539,11 @@ function montarCampoLocal(wrapId, valorAtual, status, modoEvento, tipo){
     return;
   }
   const classe = _classeStatusLocal(status, !!modoEvento);
-  if(classe === 'manutencao' || classe === 'livre'){ wrap.innerHTML = _htmlInputLocal(idCampo, valorAtual); }
+  if(classe === 'manutencao'){
+    const sugestoes = LOCAIS_OFICINA.concat(LOCAIS_UNIDADE, LOCAIS_DIRETORIA);
+    wrap.innerHTML = _htmlInputLocalComLista(idCampo, valorAtual, sugestoes);
+  }
+  else if(classe === 'livre'){ wrap.innerHTML = _htmlInputLocal(idCampo, valorAtual); }
   else if(classe === 'reserva'){ wrap.innerHTML = _htmlLocalDisabled(idCampo, LOCAL_RESERVA); }
   else if(classe === 'baixada'){ wrap.innerHTML = _htmlInputLocal(idCampo, valorAtual); }
   else { wrap.innerHTML = _htmlSelectLocal(idCampo, valorAtual); }
