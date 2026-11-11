@@ -429,7 +429,8 @@ select.stage-select:hover{border-color:var(--amber);}
 .proc-info-box .row span{color:var(--text-dim);}
 .proc-info-box .row b{color:var(--text);font-weight:600;}
 .users-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
-.users-toolbar input{min-width:220px;}
+.users-toolbar .users-toolbar-left{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-width:0;flex:1;}
+.users-toolbar input{min-width:220px;flex:0 1 auto;}
 .users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;}
 .user-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;position:relative;overflow:hidden;-webkit-touch-callout:none;}
 .user-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--text-faint);}
@@ -1012,7 +1013,10 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 
     <section class="view" id="view-usuarios">
       <div class="users-toolbar">
-        <input type="text" id="usersSearch" placeholder="Buscar por nome ou login">
+        <div class="users-toolbar-left">
+          <input type="text" id="usersSearch" placeholder="Buscar por nome ou login">
+          <button class="btn ghost" id="usersClearFilterBtn" style="display:none;">Limpar filtro</button>
+        </div>
         <button class="btn primary" id="newUserBtn">+ Novo usuário</button>
       </div>
       <div class="update-indicator" id="usersUpdateStatus">Carregando…</div>
@@ -2061,7 +2065,11 @@ function renderStatsOS(){
 function renderOS(){
   if(activeView !== 'os') return;
   renderLegendOS(); renderStatsOS(); renderTabsOS(); renderLastUpdateOS();
-  const clearBtn = $('clearFilterBtn'); if(clearBtn) clearBtn.style.display = activeStatusFilter ? 'inline-block' : 'none';
+  const clearBtn = $('clearFilterBtn');
+  if(clearBtn){
+    const hasSearch = ($('osSearch') && $('osSearch').value.trim());
+    clearBtn.style.display = (activeStatusFilter || hasSearch) ? 'inline-block' : 'none';
+  }
   if(activeTab === TAB_MANUTENCAO) renderGeralOS(TAB_MANUTENCAO);
   else if(activeTab === TAB_GERAL) renderGeralOS(null);
   else renderGeralOS(activeTab);
@@ -2245,7 +2253,11 @@ function renderSummaryViaturas(){
   ];
   $('summaryCards').innerHTML = cards.map(c => { const active = activeFilter === c.key; return `<div class="summary-card ${c.cls} ${active?'active-filter':''}" data-filter="${c.key}"><div class="label">${c.label}</div><div class="value">${c.value}</div></div>`; }).join('');
   document.querySelectorAll('#view-viaturas .summary-card').forEach(card => { card.addEventListener('click', () => { const k = card.dataset.filter; activeFilter = (activeFilter === k) ? 'todas' : k; renderViaturas(); }); });
-  const clearBtn = $('viatClearFilterBtn'); if(clearBtn) clearBtn.style.display = (activeFilter === 'todas') ? 'none' : 'inline-block';
+  const clearBtn = $('viatClearFilterBtn');
+  if(clearBtn){
+    const hasSearch = ($('viatSearch') && $('viatSearch').value.trim());
+    clearBtn.style.display = (activeFilter !== 'todas' || hasSearch) ? 'inline-block' : 'none';
+  }
 }
 
 function mapaProcViaturaAbertos(){
@@ -3001,7 +3013,10 @@ function renderManut(){
   renderSummaryManut();
   renderManutGrid();
   const clearBtn = $('manutClearFilterBtn');
-  if(clearBtn) clearBtn.style.display = (MANUT_FILTRO_STATUS !== 'abertos' || MANUT_FILTRO_TIPO) ? 'inline-block' : 'none';
+  if(clearBtn){
+    const hasSearch = ($('manutSearch') && $('manutSearch').value.trim());
+    clearBtn.style.display = (MANUT_FILTRO_STATUS !== 'abertos' || MANUT_FILTRO_TIPO || hasSearch) ? 'inline-block' : 'none';
+  }
 }
 
 let _conversaoPendenteId = null;
@@ -3818,6 +3833,8 @@ async function carregarUsuarios(){
 function renderUsuarios(){
   const q = normalizeStr($('usersSearch').value);
   const filtrados = USUARIOS_CACHE.filter(u => { if(!q) return true; return normalizeStr(u.usuario).includes(q) || normalizeStr(u.nome).includes(q); });
+  const clearBtn = $('usersClearFilterBtn');
+  if(clearBtn) clearBtn.style.display = $('usersSearch').value.trim() ? 'inline-block' : 'none';
   if(filtrados.length === 0){ $('usersContent').innerHTML = '<div class="empty">Nenhum usuário encontrado.</div>'; return; }
   const podeCriar = temPermissao('usuarios_criar'); const podeEditar = temPermissao('usuarios_editar'); const podeResetar = temPermissao('usuarios_resetar');
   const newBtn = $('newUserBtn'); if(newBtn) newBtn.style.display = podeCriar ? '' : 'none';
@@ -3922,6 +3939,10 @@ $('um-perfil').addEventListener('change', () => aplicarDefaultsPorPerfil($('um-p
 $('userModal').addEventListener('click', e => { if(e.target.id === 'userModal') fecharUserModal(); });
 $('newUserBtn').addEventListener('click', () => { if(!temPermissao('usuarios_criar')){ alert('Sem permissão.'); return; } abrirUserModal('create'); });
 $('usersSearch').addEventListener('input', debounce(renderUsuarios, 180));
+$('usersClearFilterBtn').addEventListener('click', () => {
+  $('usersSearch').value = '';
+  renderUsuarios();
+});
 
 const afStageSel = $('af-stage'); afStageSel.innerHTML = STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
 $('osSearch').addEventListener('input', debounce(() => renderOS(), 180));
