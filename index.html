@@ -470,6 +470,11 @@ select.stage-select:hover{border-color:var(--amber);}
 .report-filters{font-size:12px;color:var(--text-dim);background:var(--surface-2);border-radius:8px;padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;}
 .report-filters b{color:var(--amber);}
 .report-filters select, .report-filters input[type=text]{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-size:12px;font-family:'Inter',sans-serif;touch-action:manipulation;}
+.report-filters .multi-check-group{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.report-filters .multi-check{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:11px;cursor:pointer;color:var(--text-dim);transition:border-color .15s, color .15s, background .15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation;font-family:'Inter',sans-serif;user-select:none;-webkit-user-select:none;}
+.report-filters .multi-check:hover{border-color:var(--amber);color:var(--text);}
+.report-filters .multi-check.checked{border-color:var(--amber);color:var(--text);background:rgba(232,169,58,.1);}
+.report-filters .multi-check input{accent-color:var(--amber);margin:0;flex:none;width:13px;height:13px;}
 .report-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
 .report-table{width:100%;border-collapse:collapse;font-size:12px;}
 .report-table th{background:var(--surface-2);color:var(--amber);font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);white-space:nowrap;}
@@ -1206,13 +1211,12 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
     <div class="report-filters">
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%;">
         <span><b>Situação:</b></span>
-        <select id="prevRepFilterOleo" style="min-width:130px;">
-          <option value="">Todas</option>
-          <option value="vermelho">🔴 Atrasadas</option>
-          <option value="amarelo">🟡 Próximas</option>
-          <option value="verde">🟢 Em dia</option>
-          <option value="vazio">— Sem dados</option>
-        </select>
+        <div id="prevRepFilterOleoGroup" class="multi-check-group">
+          <label class="multi-check"><input type="checkbox" value="vermelho"> 🔴 Atrasadas</label>
+          <label class="multi-check"><input type="checkbox" value="amarelo"> 🟡 Próximas</label>
+          <label class="multi-check"><input type="checkbox" value="verde"> 🟢 Em dia</label>
+          <label class="multi-check"><input type="checkbox" value="vazio"> — Sem dados</label>
+        </div>
         <span><b>Previsão:</b></span>
         <select id="prevRepFilterPrevisao" style="min-width:170px;"><option value="">Todas</option></select>
         <span><b>KM restante:</b></span>
@@ -1337,7 +1341,7 @@ const PERM_GRUPOS = {
 };
 
 const LOCAIS_OFICINA = [
-  'FIX CAR','SAMAN PNEUS','AUTO MIX','VIDROCAR','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
+  'FIX CAR','AUTO MIX','VIDROCAR','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
   'MULTIRADIUS','RENOBAN','XINGO','PAULISTA','LEANDRO TRUCK','CAXANGA',
   'M. SOBRAL','ARIBE MOTOS','AC MOTOS',
   'SR. AROLDO','MARDISA','MORAUTO','SANVEL',
@@ -1367,9 +1371,6 @@ if(IS_IOS) document.documentElement.classList.add('is-ios');
 const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 if(IS_TOUCH) document.documentElement.classList.add('is-touch');
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Sincronização de Hora com a Internet (v6.7)
-// ═══════════════════════════════════════════════════════════════════════════
 let _serverTimeOffset = 0;
 
 async function syncInternetTime() {
@@ -1535,9 +1536,9 @@ function _nomeRelatorioManut(){
 function _nomeRelatorioPreventiva(){
   const filtros = [];
 
-  if(prevRepFiltroOleo){
+  if(prevRepFiltroOleo && prevRepFiltroOleo.length){
     const labels = { vermelho: 'Atrasadas', amarelo: 'Próximas', verde: 'Em dia', vazio: 'Sem dados' };
-    filtros.push(labels[prevRepFiltroOleo] || prevRepFiltroOleo);
+    prevRepFiltroOleo.forEach(k => filtros.push(labels[k] || k));
   }
   if(prevRepFiltroPrevisao){
     if(prevRepFiltroPrevisao === '__vencidas__') filtros.push('Previsão Vencidas');
@@ -3592,10 +3593,29 @@ function _handlePneusBuscaInput(){
   renderDropdownPneus();
 }
 
-let prevRepFiltroOleo = '';
+let prevRepFiltroOleo = [];
 let prevRepFiltroPrevisao = '';
 let prevRepFiltroKm = '';
 let prevRepFiltroBusca = '';
+
+function prevRepLerOleoSelecionado(){
+  const group = $('prevRepFilterOleoGroup');
+  if(!group) return [];
+  return Array.from(group.querySelectorAll('input:checked')).map(cb => cb.value);
+}
+function prevRepSetOleoSelecionado(valores){
+  const group = $('prevRepFilterOleoGroup');
+  if(!group) return;
+  const arr = Array.isArray(valores) ? valores : [];
+  prevRepFiltroOleo = arr.slice();
+  group.querySelectorAll('.multi-check').forEach(lbl => {
+    const cb = lbl.querySelector('input');
+    const on = arr.includes(cb.value);
+    cb.checked = on;
+    lbl.classList.toggle('checked', on);
+  });
+}
+
 function calcularPrevisaoTroca(v){
   if(v.falta != null && v.falta <= 0){ return { data: new Date(), vencida: true, origem: 'atrasada' }; }
   if(v.proximaTroca){
@@ -3643,7 +3663,7 @@ function prevRepPopularPrevisao(lista){
 }
 function prevRepAplicarFiltros(lista){
   return lista.filter(v => {
-    if(prevRepFiltroOleo && v.statusOleo !== prevRepFiltroOleo) return false;
+    if(prevRepFiltroOleo && prevRepFiltroOleo.length && !prevRepFiltroOleo.includes(v.statusOleo)) return false;
     if(prevRepFiltroPrevisao){
       const p = calcularPrevisaoTroca(v);
       if(prevRepFiltroPrevisao === '__vencidas__'){
@@ -3693,9 +3713,9 @@ function prevRepRenderTabela(){
   const dados = prevRepAplicarFiltros(base);
   prevRepRenderKpis(dados);
   const partes = [];
-  if(prevRepFiltroOleo){
+  if(prevRepFiltroOleo && prevRepFiltroOleo.length){
     const labels = { vermelho: 'Atrasadas', amarelo: 'Próximas', verde: 'Em dia', vazio: 'Sem dados' };
-    partes.push('Situação: ' + labels[prevRepFiltroOleo]);
+    partes.push('Situação: ' + prevRepFiltroOleo.map(k => labels[k] || k).join(' + '));
   }
   if(prevRepFiltroPrevisao){
     if(prevRepFiltroPrevisao === '__vencidas__') partes.push('Previsão: Vencidas');
@@ -3750,21 +3770,31 @@ function prevRepRenderTabela(){
 }
 function abrirRelatorioPreventiva(){
   if(!PREV_VIATURAS.length){ alert('Carregando dados… Aguarde um instante e tente novamente.'); loadDataPreventiva(); return; }
-  prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
-  $('prevRepFilterOleo').value = ''; $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = '';
+  prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
+  prevRepSetOleoSelecionado([]);
+  $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = '';
   prevRepPopularPrevisao(PREV_VIATURAS);
   const agora = new Date();
   $('prevReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
-  const selOleo = $('prevRepFilterOleo'); const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
-  if(selOleo && !selOleo.dataset.bound){ selOleo.dataset.bound = '1'; selOleo.addEventListener('change', () => { prevRepFiltroOleo = selOleo.value; prevRepRenderTabela(); }); }
+  const groupOleo = $('prevRepFilterOleoGroup');
+  const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
+  if(groupOleo && !groupOleo.dataset.bound){
+    groupOleo.dataset.bound = '1';
+    groupOleo.addEventListener('change', () => {
+      prevRepFiltroOleo = prevRepLerOleoSelecionado();
+      groupOleo.querySelectorAll('.multi-check').forEach(lbl => lbl.classList.toggle('checked', lbl.querySelector('input').checked));
+      prevRepRenderTabela();
+    });
+  }
   if(selPrev && !selPrev.dataset.bound){ selPrev.dataset.bound = '1'; selPrev.addEventListener('change', () => { prevRepFiltroPrevisao = selPrev.value; prevRepRenderTabela(); }); }
   if(selKm && !selKm.dataset.bound){ selKm.dataset.bound = '1'; selKm.addEventListener('change', () => { prevRepFiltroKm = selKm.value; prevRepRenderTabela(); }); }
   if(inpBusca && !inpBusca.dataset.bound){ inpBusca.dataset.bound = '1'; inpBusca.addEventListener('input', debounce(() => { prevRepFiltroBusca = inpBusca.value; prevRepRenderTabela(); }, 180)); }
   if(btnLimpar && !btnLimpar.dataset.bound){
     btnLimpar.dataset.bound = '1';
     btnLimpar.addEventListener('click', () => {
-      prevRepFiltroOleo = ''; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
-      selOleo.value = ''; selPrev.value = ''; selKm.value = ''; inpBusca.value = '';
+      prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
+      prevRepSetOleoSelecionado([]);
+      if(selPrev) selPrev.value = ''; if(selKm) selKm.value = ''; if(inpBusca) inpBusca.value = '';
       prevRepRenderTabela();
     });
   }
