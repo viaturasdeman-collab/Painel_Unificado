@@ -158,6 +158,20 @@ button{font:inherit;}
 input[type=text], input[type=password], input[type=file], select, textarea{background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-family:'Inter',sans-serif;font-size:16px;min-width:0;-webkit-appearance:none;touch-action:manipulation;}
 input[type=text]:focus, input[type=password]:focus, select:focus, textarea:focus{outline:1px solid var(--amber);}
 input[type=file]{font-size:13px;}
+input[type=text],
+input[type=search],
+textarea{
+  text-transform: uppercase;
+}
+input[type=password],
+input#loginUser{
+  text-transform: none !important;
+}
+input::placeholder,
+textarea::placeholder{
+  text-transform: none;
+  letter-spacing: normal;
+}  
 input[type=datetime-local], input[type=date], input[type=time]{background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:16px;width:100%;min-width:0;-webkit-appearance:none;touch-action:manipulation;}
 input[type=datetime-local]:focus, input[type=date]:focus, input[type=time]:focus{outline:1px solid var(--amber);}
 .pass-wrap{position:relative;display:block;width:100%;}
@@ -1570,7 +1584,29 @@ function temPermissao(p){
   return false;
 }
 function isAdmin(){ return currentPerfil === 'admin'; }
-
+const CAMPOS_NAO_UPPER = new Set([
+  'login','senha','senhaAtual','senhaNova','senhaRoot',
+  'novoUsuario','usuarioAlvo','perfil',
+  'id','idAgendamento',
+  'action','usuario'
+]);
+function upperPayload(payload){
+  if(!payload || typeof payload !== 'object') return payload;
+  const out = {};
+  for(const k of Object.keys(payload)){
+    const v = payload[k];
+    if(CAMPOS_NAO_UPPER.has(k)){
+      out[k] = v;
+    } else if(typeof v === 'string'){
+      out[k] = v.toUpperCase();
+    } else if(Array.isArray(v)){
+      out[k] = v.map(x => (typeof x === 'string') ? x.toUpperCase() : x);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
 async function apiCall(url, action, payload, opts){
   const o = opts || {};
   const semRetry = o.semRetry === true;
@@ -1581,7 +1617,7 @@ async function apiCall(url, action, payload, opts){
   try{
     const r = await fetch(url, {
       method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify(Object.assign({ action, usuario: currentLogin || '', perfil: currentPerfil || 'view' }, payload || {})),
+      body: JSON.stringify(Object.assign({ action, usuario: currentLogin || '', perfil: currentPerfil || 'view' }, upperPayload(payload || {}))),
       signal: ctrl.signal, cache:'no-store'
     });
     clearTimeout(to);
@@ -4635,6 +4671,29 @@ if(isLoggedIn()){
   try{ currentPermissoes = JSON.parse(sessionStorage.getItem('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
   startApp();
 } else { showLogin(); }
+(function caixaAltaGlobal(){
+  const SELETOR = 'input[type=text], input[type=search], textarea';
+  const IGNORAR = new Set(['loginUser','loginPass','cp-new','cp-confirm','um-root-pass']);
+  function deveIgnorar(el){
+    if(!el || !el.matches || !el.matches(SELETOR)) return true;
+    if(el.type === 'password' || el.type === 'email') return true;
+    if(el.id && IGNORAR.has(el.id)) return true;
+    if(el.classList && el.classList.contains('no-uppercase')) return true;
+    return false;
+  }
+  function forcarUpper(el){
+    if(deveIgnorar(el)) return;
+    const v = el.value;
+    if(typeof v !== 'string') return;
+    const up = v.toUpperCase();
+    if(up === v) return;
+    const s = el.selectionStart, e = el.selectionEnd;
+    el.value = up;
+    try{ el.setSelectionRange(s, e); }catch(_){}
+  }
+  document.addEventListener('input',   ev => forcarUpper(ev.target), true);
+  document.addEventListener('focusout',ev => forcarUpper(ev.target), true);
+})();
 bindPasswordToggles();
 </script>
 </body>
