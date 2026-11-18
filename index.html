@@ -2474,7 +2474,7 @@ function abrirModalMudarLocal(prefixo){
   }, 'viat_mudar');
 }
 function abrirModalPermutar(prefixo, origem, gbm){
-  const destinoAPI = origem === 'ativa' ? 'reservas' : 'ativas';
+  const destinoAPI = origem === 'ativa' ? 'reserva' : 'ativa';
   const destinoLabel = origem === 'ativa' ? 'DEMAN (Reserva)' : 'Ativa';
   const titulo = origem === 'ativa' ? `Mover ${prefixo} para Reserva` : `Ativar ${prefixo}`;
   let corpo = `<p style="font-size:13px;color:var(--text-dim);margin:0;"><b>${escapeHtml(prefixo)}</b> ${gbm?`· ${escapeHtml(gbm)}`:''} será movida para <b>${destinoLabel}</b>.</p>`;
