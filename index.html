@@ -172,6 +172,17 @@ textarea::placeholder{
   text-transform: none;
   letter-spacing: normal;
 }  
+  /* ─── EXCEÇÕES À CAIXA ALTA — login e troca de senha ─────────────── */
+#loginUser,
+#loginPass,
+#cp-new,
+#cp-confirm,
+#um-root-pass,
+#um-user,
+input[type=password] {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
 input[type=datetime-local], input[type=date], input[type=time]{background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:16px;width:100%;min-width:0;-webkit-appearance:none;touch-action:manipulation;}
 input[type=datetime-local]:focus, input[type=date]:focus, input[type=time]:focus{outline:1px solid var(--amber);}
 .pass-wrap{position:relative;display:block;width:100%;}
@@ -4693,6 +4704,38 @@ if(isLoggedIn()){
   }
   document.addEventListener('input',   ev => forcarUpper(ev.target), true);
   document.addEventListener('focusout',ev => forcarUpper(ev.target), true);
+})();
+  // ─── ANTI-PRÉ-PREENCHIMENTO DO LOGIN (mantém o Google salvando) ─────
+(function antiPrePreenchimento(){
+  const u = document.getElementById('loginUser');
+  const p = document.getElementById('loginPass');
+  if(!u || !p) return;
+
+  let usuarioInteragiu = false;
+
+  // Considera "interação real" somente teclado ou colar
+  ['keydown','paste'].forEach(evt => {
+    u.addEventListener(evt, () => { usuarioInteragiu = true; }, true);
+    p.addEventListener(evt, () => { usuarioInteragiu = true; }, true);
+  });
+
+  // NÃO limpa se o usuário estiver focado (evita apagar escolha
+  // feita no dropdown do gerenciador de senhas)
+  const limpar = () => {
+    if(usuarioInteragiu) return;
+    if(document.activeElement === u || document.activeElement === p) return;
+    if(u.value) u.value = '';
+    if(p.value) p.value = '';
+  };
+
+  limpar();
+  [80, 200, 400, 800, 1500, 2500].forEach(ms => setTimeout(limpar, ms));
+
+  // Se o usuário voltar via histórico (bfcache)
+  window.addEventListener('pageshow', () => {
+    usuarioInteragiu = false;
+    setTimeout(limpar, 120);
+  });
 })();
 bindPasswordToggles();
 </script>
