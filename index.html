@@ -644,20 +644,25 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 
 <div id="loginOverlay" class="login-overlay">
   <div class="login-box">
-    <h2>DEMAN · Acesso</h2>
-    <p class="sub">Entre com suas credenciais para continuar.</p>
-    <input type="text" id="loginUser" placeholder="Usuário" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
-    <div class="pass-wrap">
-      <input type="password" id="loginPass" placeholder="Senha" autocomplete="current-password">
-      <button type="button" class="pass-toggle" data-target="loginPass" aria-label="Mostrar senha" tabindex="-1">
-        <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-        <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-      </button>
-    </div>
-    <p id="loginError" class="login-error">Usuário ou senha inválidos.</p>
-    <button class="btn primary" id="loginBtn">Entrar</button>
-    <div class="login-footer">Uso interno · Registro de auditoria ativo</div>
+  <h2>DEMAN · Acesso</h2>
+  <p class="sub">Entre com suas credenciais para continuar.</p>
+  
+  <!-- CAMPOS ISCA: O Chrome vai preencher esses aqui e ignorar os reais -->
+  <input type="text" style="display:none" autocomplete="username">
+  <input type="password" style="display:none" autocomplete="current-password">
+
+  <input type="text" id="loginUser" placeholder="Usuário" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+  <div class="pass-wrap">
+    <input type="password" id="loginPass" placeholder="Senha" autocomplete="new-password">
+    <button type="button" class="pass-toggle" data-target="loginPass" aria-label="Mostrar senha" tabindex="-1">
+      <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+    </button>
   </div>
+  <p id="loginError" class="login-error">Usuário ou senha inválidos.</p>
+  <button class="btn primary" id="loginBtn">Entrar</button>
+  <div class="login-footer">Uso interno · Registro de auditoria ativo</div>
+</div>
 </div>
 
 <div id="app">
@@ -4705,36 +4710,39 @@ if(isLoggedIn()){
   document.addEventListener('input',   ev => forcarUpper(ev.target), true);
   document.addEventListener('focusout',ev => forcarUpper(ev.target), true);
 })();
-  // ─── ANTI-PRÉ-PREENCHIMENTO DO LOGIN (mantém o Google salvando) ─────
-(function antiPrePreenchimento(){
+// ─── ANTI-AUTOFILL DO LOGIN (BLINDADO) ──────────────────────────────
+(function blindagemLogin(){
   const u = document.getElementById('loginUser');
   const p = document.getElementById('loginPass');
   if(!u || !p) return;
 
-  let usuarioInteragiu = false;
+  let interagiu = false;
 
-  // Considera "interação real" somente teclado ou colar
-  ['keydown','paste'].forEach(evt => {
-    u.addEventListener(evt, () => { usuarioInteragiu = true; }, true);
-    p.addEventListener(evt, () => { usuarioInteragiu = true; }, true);
-  });
+  // Marca interação APENAS quando o usuário realmente digita algo
+  const marcar = () => { interagiu = true; };
+  u.addEventListener('input', marcar);
+  p.addEventListener('input', marcar);
 
-  // NÃO limpa se o usuário estiver focado (evita apagar escolha
-  // feita no dropdown do gerenciador de senhas)
+  // Limpa os campos agressivamente nos primeiros segundos
   const limpar = () => {
-    if(usuarioInteragiu) return;
-    if(document.activeElement === u || document.activeElement === p) return;
-    if(u.value) u.value = '';
-    if(p.value) p.value = '';
+    if(interagiu) return;
+    if(u.value !== '') u.value = '';
+    if(p.value !== '') p.value = '';
   };
 
-  limpar();
-  [80, 200, 400, 800, 1500, 2500].forEach(ms => setTimeout(limpar, ms));
+  // Executa várias vezes para pegar o momento exato em que o Chrome injeta o dado
+  [50, 150, 300, 600, 1000, 2000, 3500].forEach(ms => setTimeout(limpar, ms));
+  
+  // Se o usuário clicar no campo para ver as senhas salvas, paramos de limpar
+  u.addEventListener('focus', () => { interagiu = true; }, { once: true });
+  p.addEventListener('focus', () => { interagiu = true; }, { once: true });
 
-  // Se o usuário voltar via histórico (bfcache)
-  window.addEventListener('pageshow', () => {
-    usuarioInteragiu = false;
-    setTimeout(limpar, 120);
+  // Se a página voltar do cache (botão voltar)
+  window.addEventListener('pageshow', (e) => {
+    if(e.persisted) {
+      interagiu = false;
+      setTimeout(limpar, 100);
+    }
   });
 })();
 bindPasswordToggles();
