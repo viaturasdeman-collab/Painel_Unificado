@@ -585,6 +585,16 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 .prev-form-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;}
 .prev-form-actions .btn{padding:10px 18px;font-size:14px;}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
+.ms-wrap{position:relative;display:inline-block;min-width:170px;}
+.ms-btn{width:100%;text-align:left;background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 26px 6px 10px;font-size:12px;font-family:'Inter',sans-serif;cursor:pointer;position:relative;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:manipulation;}
+.ms-btn::after{content:'▾';position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--text-dim);}
+.ms-btn.has-sel{border-color:var(--amber);}
+.ms-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:320px;max-height:280px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:70;box-shadow:0 12px 32px rgba(0,0,0,.55);}
+.ms-panel.open{display:block;}
+.ms-item{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;color:var(--text-dim);cursor:pointer;border-bottom:1px solid rgba(48,58,71,.5);}
+.ms-item:last-child{border-bottom:none;}
+.ms-item:hover{background:var(--surface-2);color:var(--text);}
+.ms-item input{accent-color:var(--amber);margin:0;width:14px;height:14px;flex:none;}
 @media print{
   html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; color: #000 !important; min-height: 0 !important; height: auto !important; }
   .topbar, .sidebar, .sidebar-backdrop { display: none !important; }
@@ -608,6 +618,8 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
   .report-table th { background: #e8e8e8 !important; color: #000 !important; border-bottom: 2px solid #000 !important; }
   .report-table td { color: #000 !important; border-bottom: 1px solid #ccc !important; }
   .report-actions { display: none !important; }
+  .ms-panel { display: none !important; }
+  .ms-btn { background: #fff !important; border: 1px solid #999 !important; color: #000 !important; }
   .mes-header { color: #000 !important; background: #f2f2f2 !important; border: 1px solid #999 !important; }
   .mes-header .mes-count { color: #333 !important; background: #fff !important; border: 1px solid #999 !important; }
   .mes-group .report-table { border: 1px solid #999 !important; border-top: none !important; }
@@ -1163,7 +1175,10 @@ input::placeholder, textarea::placeholder {
         <span><b>Status:</b></span>
         <select id="repFilterStatus" style="min-width:130px;"><option value="">Todos</option></select>
         <span><b>Oficina/Empresa:</b></span>
-        <select id="repFilterOficina" style="min-width:170px;"><option value="">Todas</option></select>
+        <div class="ms-wrap">
+          <button type="button" class="ms-btn" id="repFilterOficinaBtn">Todas</button>
+          <div class="ms-panel" id="repFilterOficinaPanel"></div>
+        </div>
         <span><b>Orçada:</b></span>
         <select id="repFilterOrcada" style="min-width:100px;"><option value="">Todas</option><option value="Sim">Sim</option><option value="Não">Não</option></select>
         <span><b>Distribuída:</b></span>
@@ -1249,6 +1264,12 @@ input::placeholder, textarea::placeholder {
           <option value="medio">2.000 – 5.000 km</option>
           <option value="longo">&gt; 5.000 km</option>
           <option value="sem_dados">Sem dados</option>
+        </select>
+        <span><b>Garantia:</b></span>
+        <select id="prevRepFilterGarantia" style="min-width:130px;">
+          <option value="">Todas</option>
+          <option value="vencida">⚠ Vencida</option>
+          <option value="em_garantia">Em garantia</option>
         </select>
         <input type="text" id="prevRepFilterBusca" placeholder="Buscar prefixo/placa" style="min-width:170px;">
         <button class="btn ghost" id="prevRepFilterLimpar" style="margin-left:auto;font-size:11px;padding:5px 10px;">Limpar filtros</button>
@@ -1533,7 +1554,7 @@ function _nomeRelatorioOS(){
     const info = STAGES.find(x => x.key === repFiltroStatus);
     filtros.push(info ? info.label : repFiltroStatus);
   }
-  if(repFiltroOficina) filtros.push('Oficina ' + repFiltroOficina);
+  if(repFiltroOficina.length) filtros.push('Oficina ' + repFiltroOficina.join(' + '));
   if(repFiltroOrcada) filtros.push('Orçada ' + repFiltroOrcada);
   if(repFiltroDistribuida) filtros.push('Distribuída ' + repFiltroDistribuida);
 
@@ -1571,6 +1592,7 @@ function _nomeRelatorioPreventiva(){
     const labels = { atrasado: 'Atrasado', curto: '0-2000km', medio: '2000-5000km', longo: 'acima-5000km', sem_dados: 'Sem dados' };
     filtros.push(labels[prevRepFiltroKm] || prevRepFiltroKm);
   }
+  if(prevRepFiltroGarantia) filtros.push(prevRepFiltroGarantia === 'vencida' ? 'Garantia Vencida' : 'Em garantia');
   if(prevRepFiltroBusca) filtros.push('busca ' + prevRepFiltroBusca);
 
   return 'Relatório de Manutenção Preventiva' + (filtros.length ? ' (' + filtros.join(' - ') + ')' : '');
@@ -2120,30 +2142,47 @@ function renderOS(){
 }
 
 let repFiltroStatus       = '';
-let repFiltroOficina      = '';
+let repFiltroOficina      = [];
 let repFiltroOrcada       = '';
 let repFiltroDistribuida  = '';
 
+let _repOficinasLista = [];
+function repOficinaSync(){
+  const panel = $('repFilterOficinaPanel'), btn = $('repFilterOficinaBtn');
+  if(panel){
+    panel.querySelectorAll('input[value]').forEach(cb => { cb.checked = repFiltroOficina.includes(cb.value); });
+    const td = panel.querySelector('input[data-todas]'); if(td) td.checked = repFiltroOficina.length === 0;
+  }
+  if(btn){
+    const n = repFiltroOficina.length;
+    btn.textContent = n === 0 ? 'Todas' : (n === 1 ? repFiltroOficina[0] : n + ' selecionadas');
+    btn.title = repFiltroOficina.join(', ');
+    btn.classList.toggle('has-sel', n > 0);
+  }
+}
+function repOficinaRenderPanel(){
+  const panel = $('repFilterOficinaPanel'); if(!panel) return;
+  panel.innerHTML = '<label class="ms-item"><input type="checkbox" data-todas="1"> <b>Todas</b></label>' +
+    _repOficinasLista.map(o => `<label class="ms-item"><input type="checkbox" value="${escapeAttr(o)}"> ${escapeHtml(o)}</label>`).join('');
+  panel.classList.remove('open');
+  repOficinaSync();
+}
 function repPopularSelects(dados){
   const status = Array.from(new Set(dados.map(r => r.stage).filter(Boolean))).sort();
-  const oficinas = Array.from(new Set(dados.map(r => (r.empresa||'').trim()).filter(Boolean))).sort();
-  const selS = $('repFilterStatus'); const selO = $('repFilterOficina');
-  if(!selS || !selO) return;
+  _repOficinasLista = Array.from(new Set(dados.map(r => (r.empresa||'').trim()).filter(Boolean))).sort();
+  const selS = $('repFilterStatus'); if(!selS) return;
   selS.innerHTML = '<option value="">Todos</option>' + status.map(s => {
     const info = STAGES.find(x => x.key === s); const label = info ? info.label : s;
     const sel = (repFiltroStatus === s) ? ' selected' : '';
     return `<option value="${escapeAttr(s)}"${sel}>${escapeHtml(label)}</option>`;
   }).join('');
-  selO.innerHTML = '<option value="">Todas</option>' + oficinas.map(o => {
-    const sel = (repFiltroOficina === o) ? ' selected' : '';
-    return `<option value="${escapeAttr(o)}"${sel}>${escapeHtml(o)}</option>`;
-  }).join('');
+  repOficinaRenderPanel();
   const selOrc = $('repFilterOrcada'); if(selOrc) selOrc.value = repFiltroOrcada;
 }
 function repAplicarFiltros(dados){
   return dados.filter(r => {
     if(repFiltroStatus && r.stage !== repFiltroStatus) return false;
-    if(repFiltroOficina && (r.empresa||'').trim() !== repFiltroOficina) return false;
+    if(repFiltroOficina.length && !repFiltroOficina.includes((r.empresa||'').trim())) return false;
     if(repFiltroOrcada === 'Sim' && !(r.orcamentos > 0)) return false;
     if(repFiltroOrcada === 'Não' && (r.orcamentos > 0)) return false;
     if(repFiltroDistribuida === 'Sim' && r.distribuida !== 'Sim') return false;
@@ -2180,7 +2219,7 @@ function repRenderTabela(){
   const q = $('osSearch').value.trim(); if(q) filtros.push('Busca: "'+q+'"');
   const partes = [];
   if(repFiltroStatus) partes.push('Status: ' + ((STAGES.find(x => x.key === repFiltroStatus)||{}).label || repFiltroStatus));
-  if(repFiltroOficina) partes.push('Oficina: ' + repFiltroOficina);
+  if(repFiltroOficina.length) partes.push('Oficina: ' + repFiltroOficina.join(' + '));
   if(repFiltroOrcada) partes.push('Orçada: ' + repFiltroOrcada);
   if(repFiltroDistribuida) partes.push('Distribuída: ' + repFiltroDistribuida);
   $('repFilterResumo').innerHTML = '<b>Base:</b> ' + filtros.map(escapeHtml).join(' · ') + (partes.length ? ' · <b>Filtros:</b> ' + partes.map(escapeHtml).join(' · ') : '') + ' · <b>Exibindo:</b> ' + dados.length + ' de ' + dadosOriginais.length + ' OS';
@@ -2205,19 +2244,32 @@ function repRenderTabela(){
       }).join('');
 }
 function abrirRelatorioOS(){
-  repFiltroStatus = ''; repFiltroOficina = ''; repFiltroOrcada = ''; repFiltroDistribuida = '';
+  repFiltroStatus = ''; repFiltroOficina = []; repFiltroOrcada = ''; repFiltroDistribuida = '';
   const dados = getDadosFiltradosOS(activeTab === TAB_GERAL ? null : activeTab);
   repPopularSelects(dados);
-  const selS = $('repFilterStatus'); const selO = $('repFilterOficina'); const selOrc = $('repFilterOrcada'); const selDist = $('repFilterDistribuida'); const btnLimpar = $('repFilterLimpar');
+  const selS = $('repFilterStatus'); const selOrc = $('repFilterOrcada'); const selDist = $('repFilterDistribuida'); const btnLimpar = $('repFilterLimpar');
+  const msBtn = $('repFilterOficinaBtn'); const msPanel = $('repFilterOficinaPanel');
   if(selS && !selS.dataset.bound){ selS.dataset.bound = '1'; selS.addEventListener('change', () => { repFiltroStatus = selS.value; repRenderTabela(); }); }
-  if(selO && !selO.dataset.bound){ selO.dataset.bound = '1'; selO.addEventListener('change', () => { repFiltroOficina = selO.value; repRenderTabela(); }); }
+  if(msBtn && msPanel && !msBtn.dataset.bound){
+    msBtn.dataset.bound = '1';
+    msBtn.addEventListener('click', e => { e.stopPropagation(); msPanel.classList.toggle('open'); });
+    msPanel.addEventListener('click', e => e.stopPropagation());
+    msPanel.addEventListener('change', e => {
+      const cb = e.target; if(!cb || cb.type !== 'checkbox') return;
+      repFiltroOficina = cb.dataset.todas ? [] : Array.from(msPanel.querySelectorAll('input[value]:checked')).map(x => x.value);
+      repOficinaSync();
+      repRenderTabela();
+    });
+    document.addEventListener('click', () => msPanel.classList.remove('open'));
+  }
   if(selOrc && !selOrc.dataset.bound){ selOrc.dataset.bound = '1'; selOrc.addEventListener('change', () => { repFiltroOrcada = selOrc.value; repRenderTabela(); }); }
   if(selDist && !selDist.dataset.bound){ selDist.dataset.bound = '1'; selDist.addEventListener('change', () => { repFiltroDistribuida = selDist.value; repRenderTabela(); }); }
   if(btnLimpar && !btnLimpar.dataset.bound){
     btnLimpar.dataset.bound = '1';
     btnLimpar.addEventListener('click', () => {
-      repFiltroStatus = ''; repFiltroOficina = ''; repFiltroOrcada = ''; repFiltroDistribuida = '';
-      if(selS) selS.value = ''; if(selO) selO.value = ''; if(selOrc) selOrc.value = ''; if(selDist) selDist.value = '';
+      repFiltroStatus = ''; repFiltroOficina = []; repFiltroOrcada = ''; repFiltroDistribuida = '';
+      if(selS) selS.value = ''; if(selOrc) selOrc.value = ''; if(selDist) selDist.value = '';
+      repOficinaSync();
       repRenderTabela();
     });
   }
@@ -3656,6 +3708,12 @@ let prevRepFiltroOleo = [];
 let prevRepFiltroPrevisao = '';
 let prevRepFiltroKm = '';
 let prevRepFiltroBusca = '';
+let prevRepFiltroGarantia = '';
+function prevRepGarantiaStatus(v){
+  const s = String(v.garantia||'').trim().toUpperCase();
+  if(!s || s === '0') return 'sem_dados';
+  return s.indexOf('VENCID') !== -1 ? 'vencida' : 'em_garantia';
+}
 
 function prevRepLerOleoSelecionado(){
   const group = $('prevRepFilterOleoGroup');
@@ -3733,6 +3791,7 @@ function prevRepAplicarFiltros(lista){
         if(ym !== prevRepFiltroPrevisao) return false;
       }
     }
+    if(prevRepFiltroGarantia && prevRepGarantiaStatus(v) !== prevRepFiltroGarantia) return false;
     if(prevRepFiltroKm){
       if(prevRepFiltroKm === 'sem_dados'){
         if(v.kmAtual != null && v.kmProxima != null) return false;
@@ -3784,6 +3843,7 @@ function prevRepRenderTabela(){
     const labels = { atrasado: 'Atrasado', curto: '0–2.000', medio: '2.000–5.000', longo: '>5.000', sem_dados: 'Sem dados' };
     partes.push('KM: ' + labels[prevRepFiltroKm]);
   }
+  if(prevRepFiltroGarantia) partes.push('Garantia: ' + (prevRepFiltroGarantia === 'vencida' ? 'Vencida' : 'Em garantia'));
   if(prevRepFiltroBusca) partes.push('Busca: "' + prevRepFiltroBusca + '"');
   $('prevRepFilterResumo').innerHTML =
     '<b>Filtros:</b> ' + (partes.length ? partes.map(escapeHtml).join(' · ') : 'nenhum') +
@@ -3829,14 +3889,14 @@ function prevRepRenderTabela(){
 }
 function abrirRelatorioPreventiva(){
   if(!PREV_VIATURAS.length){ alert('Carregando dados… Aguarde um instante e tente novamente.'); loadDataPreventiva(); return; }
-  prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
+  prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = ''; prevRepFiltroGarantia = '';
   prevRepSetOleoSelecionado([]);
-  $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = '';
+  $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = ''; $('prevRepFilterGarantia').value = '';
   prevRepPopularPrevisao(PREV_VIATURAS);
   const agora = new Date();
   $('prevReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
   const groupOleo = $('prevRepFilterOleoGroup');
-  const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
+  const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const selGar = $('prevRepFilterGarantia'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
   if(groupOleo && !groupOleo.dataset.bound){
     groupOleo.dataset.bound = '1';
     groupOleo.addEventListener('change', () => {
@@ -3847,13 +3907,14 @@ function abrirRelatorioPreventiva(){
   }
   if(selPrev && !selPrev.dataset.bound){ selPrev.dataset.bound = '1'; selPrev.addEventListener('change', () => { prevRepFiltroPrevisao = selPrev.value; prevRepRenderTabela(); }); }
   if(selKm && !selKm.dataset.bound){ selKm.dataset.bound = '1'; selKm.addEventListener('change', () => { prevRepFiltroKm = selKm.value; prevRepRenderTabela(); }); }
+  if(selGar && !selGar.dataset.bound){ selGar.dataset.bound = '1'; selGar.addEventListener('change', () => { prevRepFiltroGarantia = selGar.value; prevRepRenderTabela(); }); }
   if(inpBusca && !inpBusca.dataset.bound){ inpBusca.dataset.bound = '1'; inpBusca.addEventListener('input', debounce(() => { prevRepFiltroBusca = inpBusca.value; prevRepRenderTabela(); }, 180)); }
   if(btnLimpar && !btnLimpar.dataset.bound){
     btnLimpar.dataset.bound = '1';
     btnLimpar.addEventListener('click', () => {
-      prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = '';
+      prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = ''; prevRepFiltroGarantia = '';
       prevRepSetOleoSelecionado([]);
-      if(selPrev) selPrev.value = ''; if(selKm) selKm.value = ''; if(inpBusca) inpBusca.value = '';
+      if(selPrev) selPrev.value = ''; if(selKm) selKm.value = ''; if(selGar) selGar.value = ''; if(inpBusca) inpBusca.value = '';
       prevRepRenderTabela();
     });
   }
