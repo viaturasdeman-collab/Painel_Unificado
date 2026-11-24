@@ -1,0 +1,3406 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════════════
+const OS_APPS_SCRIPT_URL       = 'https://script.google.com/macros/s/AKfycbzMVSQtq7RSHFRnzRPFQgV-_YQ-TCWId3XrXiynaZ6gajqwKhaMZxe7ISRqAM8PTqyP3g/exec';
+const VIATURAS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzTBLYK1DGYKjndJZYt2mm03aLiuwyamzc4s2dDsYY_YJpj3fh0CaptQGG1hMReJhqG/exec';
+const MANUT_APPS_SCRIPT_URL    = 'https://script.google.com/macros/s/AKfycbySCsyvti0wJQdkt1IxoSBOmi3sHpFF6uPwOF9smssIihF7rb3GFlpFXfjh7EN2gf8m/exec';
+const PREVENTIVA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmZzTwytFmLHQLS0v3k6w9JluLS7sQ91sOnuxK-3BDSuBTOe5kEHsx1XMXcUCcdiPnFA/exec';
+const STORAGE_KEY_OS    = 'deman_data_os_v1';
+const STORAGE_KEY_VIAT  = 'deman_cache_viaturas_v1';
+const POLLING_INTERVAL  = 180000;
+const SENHA_PADRAO      = 'deman@2026';
+const ROOT_LOGIN        = 'deman';
+const WHATSAPP_DESTINO  = '';
+
+
+const PERMISSOES_LISTA = [
+  { key:'ver_os', label:'Ver OS-BAMEX', grupo:'OS' },
+  { key:'os_criar', label:'Criar OS', grupo:'OS' },
+  { key:'os_editar', label:'Editar OS', grupo:'OS' },
+  { key:'os_status', label:'Alterar status de OS', grupo:'OS' },
+  { key:'os_relatorio', label:'Gerar relatório de OS', grupo:'OS' },
+  { key:'ver_viaturas', label:'Ver Viaturas', grupo:'Viaturas' },
+  { key:'viat_gerenciar', label:'Gerenciar viaturas (tudo)', grupo:'Viaturas' },
+  { key:'viat_mudar', label:'· Mudar local', grupo:'Viaturas' },
+  { key:'viat_permutar', label:'· Permutar / Ativar', grupo:'Viaturas' },
+  { key:'viat_baixar', label:'· Baixar', grupo:'Viaturas' },
+  { key:'viat_reativar', label:'· Reativar', grupo:'Viaturas' },
+  { key:'ver_manutencao', label:'Ver Movimentação', grupo:'Movimentação' },
+  { key:'manut_editar', label:'Editar movimentação (tudo)', grupo:'Movimentação' },
+  { key:'manut_criar', label:'· Criar processo', grupo:'Movimentação' },
+  { key:'manut_excluir', label:'· Excluir processo (aberto)', grupo:'Movimentação' },
+  { key:'manut_excluir_fechado', label:'· Excluir processo finalizado', grupo:'Movimentação' },
+  { key:'ver_preventiva', label:'Ver Manutenção Preventiva', grupo:'Manutenção Preventiva' },
+  { key:'prev_editar_km', label:'· Editar KM / Registrar troca', grupo:'Manutenção Preventiva' },
+  { key:'admin_usuarios', label:'Gerenciar usuários (tudo)', grupo:'Usuários' },
+  { key:'usuarios_criar', label:'· Criar contas', grupo:'Usuários' },
+  { key:'usuarios_editar', label:'· Editar contas', grupo:'Usuários' },
+  { key:'usuarios_resetar', label:'· Resetar senha', grupo:'Usuários' }
+];
+const PERM_GRUPOS = {
+  viat_mudar:'viat_gerenciar', viat_permutar:'viat_gerenciar', viat_baixar:'viat_gerenciar', viat_reativar:'viat_gerenciar',
+  manut_criar:'manut_editar', manut_excluir:'manut_editar', manut_excluir_fechado:'manut_editar',
+  usuarios_criar:'admin_usuarios', usuarios_editar:'admin_usuarios', usuarios_resetar:'admin_usuarios'
+};
+
+const LOCAIS_OFICINA = [
+  'FIX CAR','AUTO MIX','VIDROCAR','ARCOM','DAKAR','POTTENTE','MOVESA','BR DIESEL','TAVARES',
+  'MULTIRADIUS','RENOBAN','XINGO','PAULISTA','LEANDRO TRUCK','CAXANGA',
+  'M. SOBRAL','ARIBE MOTOS','AC MOTOS',
+  'SR. AROLDO','MARDISA','MORAUTO','SANVEL',
+  'TOTAL ACESSÓRIOS','RODOPEÇAS','ITABAIANA ACESSÓRIOS','ADESIVE-SE',
+  'POTENTE','OFICINA DE MOTO','ESCAPE SOLUTIONS'
+];
+const LOCAIS_UNIDADE = [
+  '1° GBM/1° SGBM','2° SGBM','2° GBM','3° GBM','4° GBM','5° GBM','6° GBM','7° GBM','GBS'
+];
+const LOCAIS_DIRETORIA = [
+  'DOP','DEP','DAT','DLOG','DGP','DPLAN','ASSIN','ASTEI','ASTEA','ASCOM','ASTINF',
+  'CSMP','SAT','GABINETE DO COMANDO','CIOSP','COBOM','CORREGEDORIA','CANIL'
+];
+const LOCAL_RESERVA = 'DEMAN';
+const LOCAIS_BAIXADA = [LOCAL_RESERVA].concat(LOCAIS_OFICINA);
+
+const TIPO_VIATURA     = 'Viatura';
+const TIPO_OUTRO       = 'Outro';
+const TIPO_AGENDAMENTO = 'Agendamento';
+const EVENTO_ENTRADA      = 'Entrada';
+const EVENTO_AGENDAMENTO  = 'Agendamento';
+const EVENTO_FINALIZACAO  = 'Finalização';
+
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+if(IS_IOS) document.documentElement.classList.add('is-ios');
+const IS_TOUCH = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+if(IS_TOUCH) document.documentElement.classList.add('is-touch');
+
+let _serverTimeOffset = 0;
+
+async function syncInternetTime() {
+  const fontes = [
+    async () => {
+      const r = await fetch('https://timeapi.io/api/Time/current/zone?timeZone=America/Sao_Paulo', { cache: 'no-store' });
+      const d = await r.json();
+      return new Date(d.year, d.month - 1, d.day, d.hour, d.minute, d.seconds);
+    },
+    async () => {
+      const r = await fetch('https://worldtimeapi.org/api/timezone/America/Sao_Paulo', { cache: 'no-store' });
+      const d = await r.json();
+      return new Date(d.datetime);
+    }
+  ];
+  for (const fonte of fontes) {
+    try {
+      const serverDate = await fonte();
+      if (serverDate && !isNaN(serverDate.getTime())) {
+        _serverTimeOffset = serverDate.getTime() - Date.now();
+        console.log('[DEMAN] Hora sincronizada. Offset =', _serverTimeOffset, 'ms');
+        return;
+      }
+    } catch (e) {
+      console.warn('[DEMAN] Fonte de hora falhou:', e);
+    }
+  }
+  console.warn('[DEMAN] Não foi possível sincronizar; usando relógio local.');
+}
+
+function getNowTime() {
+  return Date.now() + _serverTimeOffset;
+}
+
+// Campos de senha: input type="text" mascarado por CSS (-webkit-text-security).
+// O gerenciador de senhas do navegador só age sobre type="password", então não
+// oferece mais "salvar senha". Navegadores sem suporte a esse CSS usam o
+// type="password" tradicional como alternativa.
+(function(){
+  const suporta = !!(window.CSS && CSS.supports && (CSS.supports('-webkit-text-security','disc') || CSS.supports('text-security','disc')));
+  if(suporta) return;
+  document.querySelectorAll('.pw-field').forEach(i => {
+    i.type = 'password'; i.classList.add('pw-nativo'); i.setAttribute('autocomplete','new-password');
+  });
+})();
+function bindPasswordToggles(){
+  document.querySelectorAll('.pass-toggle').forEach(btn => {
+    if(btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const input = document.getElementById(btn.dataset.target);
+      if(!input) return;
+      let mostrar;
+      if(input.classList.contains('pw-nativo')){ mostrar = input.type === 'password'; input.type = mostrar ? 'text' : 'password'; }
+      else { mostrar = !input.classList.contains('pw-visible'); input.classList.toggle('pw-visible', mostrar); }
+      btn.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+      const eye = btn.querySelector('.icon-eye');
+      const eyeOff = btn.querySelector('.icon-eye-off');
+      if(eye) eye.style.display = mostrar ? 'none' : 'block';
+      if(eyeOff) eyeOff.style.display = mostrar ? 'block' : 'none';
+      try{ input.focus(); }catch(err){}
+    });
+  });
+}
+
+let _warmupPromise = null;
+function _pingVersao(url){
+  if(!url || url.indexOf('COLE_AQUI') !== -1) return Promise.resolve();
+  return fetch(url, {
+    method:'POST', headers:{'Content-Type':'text/plain'},
+    body: JSON.stringify({ action:'versao' }), cache:'no-store'
+  }).catch(()=>{});
+}
+(function warmUp(){
+  _warmupPromise = Promise.race([
+    Promise.all([
+      _pingVersao(OS_APPS_SCRIPT_URL),
+      _pingVersao(VIATURAS_APPS_SCRIPT_URL),
+      _pingVersao(MANUT_APPS_SCRIPT_URL),
+      _pingVersao(PREVENTIVA_APPS_SCRIPT_URL)
+    ]),
+    new Promise(res => setTimeout(res, 22000))
+  ]);
+})();
+setInterval(() => {
+  if (document.hidden) return;
+  if (!isLoggedIn()) return;
+  _pingVersao(OS_APPS_SCRIPT_URL);
+  _pingVersao(VIATURAS_APPS_SCRIPT_URL);
+  _pingVersao(MANUT_APPS_SCRIPT_URL);
+  _pingVersao(PREVENTIVA_APPS_SCRIPT_URL);
+}, 5 * 60 * 1000);
+
+function normalizeStr(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); }
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function debounce(fn, wait=180){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),wait); }; }
+function $(id){ return document.getElementById(id); }
+
+function _abrirReportModal(id){
+  const el = $(id); if(!el) return;
+  el.classList.add('is-open');
+  el.style.display = 'flex';
+  document.body.classList.add('relatorio-aberto');
+}
+function _fecharReportModal(id){
+  const el = $(id); if(!el) return;
+  el.classList.remove('is-open');
+  el.style.display = 'none';
+  document.body.classList.remove('relatorio-aberto');
+}
+
+function imprimirComTitulo(nomeBase){
+  const seguro = String(nomeBase || 'Relatório')
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const data = pad(d.getDate()) + '-' + pad(d.getMonth()+1) + '-' + d.getFullYear();
+  const tituloOriginal = document.title;
+  const tituloImpressao = seguro + ' ' + data;
+  document.title = tituloImpressao;
+
+  let restaurado = false;
+  function restaurar(){
+    if(restaurado) return;
+    restaurado = true;
+    document.title = tituloOriginal;
+    window.removeEventListener('afterprint', restaurar);
+  }
+  window.addEventListener('afterprint', restaurar);
+  setTimeout(restaurar, 60000);
+
+  setTimeout(() => window.print(), 50);
+}
+
+function _nomeRelatorioOS(){
+  const filtros = [];
+
+  if(activeTab === TAB_MANUTENCAO) filtros.push('Manutenção');
+  else if(activeTab === TAB_GERAL) filtros.push('Visão Geral');
+  else filtros.push(activeTab);
+
+  if(activeStatusFilter) filtros.push(activeStatusFilter);
+
+  if(repFiltroStatus){
+    const info = STAGES.find(x => x.key === repFiltroStatus);
+    filtros.push(info ? info.label : repFiltroStatus);
+  }
+  if(repFiltroOficina.length) filtros.push('Oficina ' + repFiltroOficina.join(' + '));
+  if(repFiltroOrcada) filtros.push('Orçada ' + repFiltroOrcada);
+  if(repFiltroDistribuida) filtros.push('Distribuída ' + repFiltroDistribuida);
+
+  const q = ($('osSearch') && $('osSearch').value) ? $('osSearch').value.trim() : '';
+  if(q) filtros.push('busca ' + q);
+
+  return 'Relatório de OS-BAMEX' + (filtros.length ? ' (' + filtros.join(' - ') + ')' : '');
+}
+
+function _nomeRelatorioManut(){
+  const filtros = [];
+  const modo = $('manutReportMode') ? $('manutReportMode').value : 'detalhado';
+  const mes  = $('manutReportMonth') ? $('manutReportMonth').value : '';
+
+  filtros.push(modo === 'mes' ? 'Por mês' : 'Processos');
+  if(mes) filtros.push(formatarMesAno(mes).replace('/', '-'));
+  if(manutRepStatusFiltro) filtros.push(manutRepStatusFiltro);
+  if(MANUT_FILTRO_TIPO) filtros.push(MANUT_FILTRO_TIPO);
+
+  return 'Relatório de Movimentação' + (filtros.length ? ' (' + filtros.join(' - ') + ')' : '');
+}
+
+function _nomeRelatorioPreventiva(){
+  const filtros = [];
+
+  if(prevRepFiltroOleo && prevRepFiltroOleo.length){
+    const labels = { vermelho: 'Atrasadas', amarelo: 'Próximas', verde: 'Em dia', vazio: 'Sem dados' };
+    prevRepFiltroOleo.forEach(k => filtros.push(labels[k] || k));
+  }
+  if(prevRepFiltroPrevisao){
+    if(prevRepFiltroPrevisao === '__vencidas__') filtros.push('Previsão Vencidas');
+    else filtros.push('Previsão ' + formatarMesAno(prevRepFiltroPrevisao).replace('/', '-'));
+  }
+  if(prevRepFiltroKm){
+    const labels = { atrasado: 'Atrasado', curto: '0-2000km', medio: '2000-5000km', longo: 'acima-5000km', sem_dados: 'Sem dados' };
+    filtros.push(labels[prevRepFiltroKm] || prevRepFiltroKm);
+  }
+  if(prevRepFiltroGarantia) filtros.push(prevRepFiltroGarantia === 'vencida' ? 'Garantia Vencida' : 'Em garantia');
+  if(prevRepFiltroBusca) filtros.push('busca ' + prevRepFiltroBusca);
+
+  return 'Relatório de Manutenção Preventiva' + (filtros.length ? ' (' + filtros.join(' - ') + ')' : '');
+}
+
+const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+function formatarMesAno(ym){ if(!ym) return ''; const p = ym.split('-'); return MESES_PT[parseInt(p[1],10)-1] + '/' + p[0]; }
+
+let currentUser = ''; let currentPerfil = 'view'; let currentLogin = ''; let currentPermissoes = {}; let primeiraSenhaUsada = ''; let currentToken = '';
+function isLoggedIn(){ return sessionStorage.getItem('deman_auth') === 'ok' && !!sessionStorage.getItem('deman_token'); }
+function temPermissao(p){
+  if(currentLogin === ROOT_LOGIN) return true;
+  if(currentPermissoes[p] === true) return true;
+  const guarda = PERM_GRUPOS[p];
+  if(guarda && currentPermissoes[guarda] === true) return true;
+  return false;
+}
+function isAdmin(){ return currentPerfil === 'admin'; }
+
+// ─── CAIXA ALTA — sanitiza payload antes de enviar ────────────────────
+let _sessaoExpirando = false;
+function _sessaoExpirou(){
+  if(_sessaoExpirando) return;
+  _sessaoExpirando = true;
+  alert('Sua sessão expirou. Entre novamente.');
+  handleLogout();
+}
+async function apiCall(url, action, payload, opts){
+  const o = opts || {};
+  const semRetry = o.semRetry === true;
+  const timeoutMs = o.timeout || 60000;
+  const tentativa = o._tentativa || 1;
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), timeoutMs);
+  try{
+    const r = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify(Object.assign({ action, usuario: currentLogin || '', perfil: currentPerfil || 'view', token: currentToken || '' }, (payload || {}))),
+      signal: ctrl.signal, cache:'no-store'
+    });
+    clearTimeout(to);
+    if(!r.ok){
+      if(!semRetry && tentativa === 1 && r.status >= 500){
+        await new Promise(res => setTimeout(res, 2000));
+        return apiCall(url, action, payload, Object.assign({}, o, { _tentativa: 2 }));
+      }
+      return { ok:false, error:'HTTP ' + r.status };
+    }
+    const txt = await r.text();
+    try{ const j = JSON.parse(txt); if(j && j.sessaoExpirada) setTimeout(_sessaoExpirou, 0); return j; }
+    catch(e){
+      if(!semRetry && tentativa === 1){
+        await new Promise(res => setTimeout(res, 1500));
+        return apiCall(url, action, payload, Object.assign({}, o, { _tentativa: 2 }));
+      }
+      return { ok:false, error:'Resposta inválida' };
+    }
+  }catch(err){
+    clearTimeout(to);
+    if(!semRetry && tentativa === 1){
+      await new Promise(res => setTimeout(res, 2000));
+      return apiCall(url, action, payload, Object.assign({}, o, { _tentativa: 2 }));
+    }
+    if(err.name === 'AbortError') return { ok:false, error:'Tempo esgotado.' };
+    return { ok:false, error:'Erro de rede: ' + err.message };
+  }
+}
+const apiOS       = (a,p) => apiCall(OS_APPS_SCRIPT_URL, a, p);
+const apiViaturas = (a,p) => apiCall(VIATURAS_APPS_SCRIPT_URL, a, p);
+const apiManut    = (a,p) => apiCall(MANUT_APPS_SCRIPT_URL, a, p);
+const apiPrev     = (a,p) => apiCall(PREVENTIVA_APPS_SCRIPT_URL, a, p);
+
+function showLogin(){ $('loginOverlay').style.display = 'flex'; $('loginUser').focus(); }
+function hideLogin(){ $('loginOverlay').style.display = 'none'; }
+
+async function handleLogin(){
+  const u = $('loginUser').value.trim().toLowerCase();
+  const p = $('loginPass').value;
+  const err = $('loginError'); const btn = $('loginBtn');
+  if(!u || !p){ err.textContent = 'Preencha usuário e senha.'; err.style.display='block'; return; }
+  btn.disabled = true; btn.textContent = 'Conectando…'; err.style.display = 'none';
+  const t1 = setTimeout(() => { if(btn.disabled) btn.textContent = 'Aguardando servidor…'; }, 4000);
+  const t2 = setTimeout(() => { if(btn.disabled) btn.textContent = 'Servidor iniciando…'; }, 12000);
+  const t3 = setTimeout(() => { if(btn.disabled) btn.textContent = 'Quase lá…'; }, 20000);
+  const t4 = setTimeout(() => { if(btn.disabled) btn.textContent = 'Aguardando… (até 55s)'; }, 35000);
+  if(_warmupPromise){ try{ await _warmupPromise; }catch(e){} }
+  clearTimeout(t1); clearTimeout(t2);
+  btn.textContent = 'Entrando…';
+  const r = await apiOS('autenticar', { login:u, senha:p }, { semRetry:true, timeout:55000 });
+  clearTimeout(t3); clearTimeout(t4);
+  btn.disabled = false; btn.textContent = 'Entrar';
+  if(!r.ok){ err.textContent = r.error || 'Usuário ou senha inválidos.'; err.style.display = 'block'; return; }
+  if(!r.token){ err.textContent = 'Servidor desatualizado (sem sessão). Avise o administrador.'; err.style.display = 'block'; return; }
+  primeiraSenhaUsada = p;
+  $('loginPass').value = '';
+  currentToken = r.token;
+  sessionStorage.setItem('deman_token', r.token);
+  sessionStorage.setItem('deman_auth','ok');
+  sessionStorage.setItem('deman_user_login', u);
+  sessionStorage.setItem('deman_user_nome', r.nome || u);
+  sessionStorage.setItem('deman_user_perfil', r.perfil || 'view');
+  sessionStorage.setItem('deman_user_permissoes', JSON.stringify(r.permissoes || {}));
+  currentLogin = u; currentUser = r.nome || u; currentPerfil = r.perfil || 'view'; currentPermissoes = r.permissoes || {};
+  if(r.primeiroAcesso === true){ hideLogin(); abrirTrocarSenha(true); return; }
+  startApp();
+}
+function handleLogout(){
+  const fim = () => { try{ localStorage.removeItem(STORAGE_KEY_OS); }catch(e){} try{ sessionStorage.clear(); }catch(e){} location.reload(); };
+  if(currentToken && !_sessaoExpirando){
+    Promise.race([
+      apiCall(OS_APPS_SCRIPT_URL, 'logout', {}, { semRetry:true, timeout:4000 }),
+      new Promise(res => setTimeout(res, 2000))
+    ]).then(fim, fim);
+  } else { fim(); }
+}
+
+let modoTrocaSenha = 'primeiro';
+function abrirTrocarSenha(obrigatorio){
+  modoTrocaSenha = obrigatorio ? 'primeiro' : 'voluntario';
+  $('cp-new').value = ''; $('cp-confirm').value = '';
+  $('cp-error').style.display = 'none'; $('cp-error').textContent = '';
+  $('changePassModal').style.display = 'flex'; $('cp-new').focus();
+}
+async function salvarNovaSenha(){
+  const nova = $('cp-new').value; const conf = $('cp-confirm').value;
+  const err = $('cp-error'); const btn = $('cp-save');
+  err.style.display = 'none'; err.textContent = '';
+  if(nova.length < 6){ err.textContent = 'A senha deve ter pelo menos 6 caracteres.'; err.style.display='block'; return; }
+  if(nova === SENHA_PADRAO){ err.textContent = 'A nova senha não pode ser a padrão.'; err.style.display='block'; return; }
+  if(nova !== conf){ err.textContent = 'As senhas não coincidem.'; err.style.display='block'; return; }
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  const r = await apiCall(OS_APPS_SCRIPT_URL, 'trocarSenha', { login: currentLogin, senhaAtual: primeiraSenhaUsada, senhaNova: nova });
+  btn.disabled = false; btn.textContent = 'Salvar e entrar';
+  if(!r.ok){ err.textContent = r.error || 'Não foi possível trocar a senha.'; err.style.display = 'block'; return; }
+  $('changePassModal').style.display = 'none';
+  if(modoTrocaSenha === 'primeiro'){ primeiraSenhaUsada = nova; startApp(); }
+  else alert('Senha alterada com sucesso.');
+}
+
+let modoUserModal = 'create'; let editUserLogin = '';
+function renderPermissoesNoModal(){
+  const container = $('permGrid'); if(!container) return;
+  const grupos = {};
+  PERMISSOES_LISTA.forEach(p => { const g = p.grupo || 'Outras'; if(!grupos[g]) grupos[g] = []; grupos[g].push(p); });
+  container.innerHTML = Object.keys(grupos).map(g => `
+    <div style="margin-bottom:14px;">
+      <div style="font-size:10px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">${escapeHtml(g)}</div>
+      <div class="perm-grid">
+        ${grupos[g].map(p => `
+          <label class="perm-check" data-perm="${escapeAttr(p.key)}">
+            <input type="checkbox" id="pm-${escapeAttr(p.key)}">
+            <span class="perm-label">${escapeHtml(p.label)}</span>
+          </label>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+  container.querySelectorAll('.perm-check').forEach(label => {
+    label.querySelector('input').addEventListener('change', atualizarEstadoCheckboxes);
+  });
+  atualizarEstadoCheckboxes();
+}
+function setPermissoesNoForm(perms){ PERMISSOES_LISTA.forEach(p => { const cb = $('pm-'+p.key); if(cb) cb.checked = !!perms[p.key]; }); atualizarEstadoCheckboxes(); }
+function atualizarEstadoCheckboxes(){ document.querySelectorAll('#permGrid .perm-check').forEach(label => { const cb = label.querySelector('input'); label.classList.toggle('checked', cb.checked); }); }
+function aplicarDefaultsPorPerfil(perfil){
+  const admin = {}; const view = {};
+  PERMISSOES_LISTA.forEach(p => { admin[p.key] = true; view[p.key] = false; });
+  view.ver_os = true; view.ver_viaturas = true; view.ver_manutencao = true; view.ver_preventiva = true;
+  setPermissoesNoForm(perfil === 'admin' ? admin : view);
+}
+function lerPermissoesDoForm(){ const out = {}; PERMISSOES_LISTA.forEach(p => { const cb = $('pm-'+p.key); out[p.key] = cb ? cb.checked : false; }); return out; }
+function abrirUserModal(modo, user){
+  modoUserModal = modo; editUserLogin = '';
+  $('userModalTitle').textContent = modo === 'create' ? 'Criar nova conta' : 'Editar usuário';
+  if(modo === 'create'){
+    $('userModalHelp').style.display = '';
+    $('um-user').value = ''; $('um-user').disabled = false;
+    $('um-nome').value = ''; $('um-perfil').value = 'view';
+    $('um-root-label').style.display = ''; $('um-root-pass').value = '';
+    $('um-reset').style.display = 'none';
+    aplicarDefaultsPorPerfil('view');
+  } else {
+    editUserLogin = user.usuario;
+    $('userModalHelp').style.display = 'none';
+    $('um-user').value = user.usuario; $('um-user').disabled = true;
+    $('um-nome').value = user.nome || '';
+    $('um-perfil').value = user.perfil || 'view';
+    $('um-root-label').style.display = 'none';
+    $('um-reset').style.display = 'inline-block';
+    setPermissoesNoForm(user.permissoes || {});
+  }
+  $('um-error').style.display = 'none'; $('um-error').textContent = '';
+  $('userModal').style.display = 'flex';
+  setTimeout(() => { (modo==='create' ? $('um-user') : $('um-nome')).focus(); }, 60);
+}
+function fecharUserModal(){ $('userModal').style.display = 'none'; modoUserModal = 'create'; editUserLogin = ''; }
+async function salvarUserModal(){
+  const err = $('um-error'); const btn = $('um-save');
+  err.style.display = 'none'; err.textContent = '';
+  const nome = $('um-nome').value.trim();
+  const perfil = $('um-perfil').value;
+  const permissoes = lerPermissoesDoForm();
+  if(!nome){ err.textContent = 'Informe o nome de exibição.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  let r;
+  if(modoUserModal === 'create'){
+    const user = $('um-user').value.trim().toLowerCase();
+    const senhaRoot = $('um-root-pass').value;
+    if(!user){ err.textContent = 'Informe o usuário.'; err.style.display='block'; btn.disabled=false; btn.textContent='Salvar'; return; }
+    if(!/^[a-z0-9._-]{3,}$/.test(user)){ err.textContent = 'Usuário inválido (mín. 3 caracteres).'; err.style.display='block'; btn.disabled=false; btn.textContent='Salvar'; return; }
+    if(!senhaRoot){ err.textContent = 'Informe a senha do administrador.'; err.style.display='block'; btn.disabled=false; btn.textContent='Salvar'; return; }
+    r = await apiOS('criarUsuario', { novoUsuario:user, novoNome:nome, perfil, permissoes, senhaRoot });
+  } else {
+    r = await apiOS('atualizarUsuario', { usuarioAlvo: editUserLogin, perfil, permissoes });
+  }
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(!r.ok){ err.textContent = r.error || 'Não foi possível salvar.'; err.style.display = 'block'; return; }
+  fecharUserModal();
+  await carregarUsuarios();
+}
+async function resetarSenhaUsuario(){
+  if(!editUserLogin) return;
+  if(!confirm('Resetar a senha de "'+editUserLogin+'" para a padrão?')) return;
+  const btn = $('um-reset');
+  btn.disabled = true; btn.textContent = 'Resetando…';
+  const r = await apiOS('resetarSenha', { usuarioAlvo: editUserLogin });
+  btn.disabled = false; btn.textContent = 'Resetar senha';
+  if(!r.ok){ alert('Erro: ' + r.error); return; }
+  alert('Senha resetada com sucesso.');
+  fecharUserModal();
+  await carregarUsuarios();
+}
+
+let activeView = 'home';
+const VIEW_TITLES = { home:'Início', os:'Status das OS-BAMEX', viaturas:'Painel de Viaturas por Local', preventiva:'Manutenção Preventiva', manutencao:'Painel de Movimentação', usuarios:'Gerenciamento de Usuários' };
+const VIEW_PERMS = { home: null, os: 'ver_os', viaturas: 'ver_viaturas', preventiva: 'ver_preventiva', manutencao: 'ver_manutencao', usuarios: 'admin_usuarios' };
+const isMobile = () => window.matchMedia('(max-width:900px)').matches;
+function podeVerUsuarios(){ return temPermissao('admin_usuarios') || temPermissao('usuarios_criar') || temPermissao('usuarios_editar') || temPermissao('usuarios_resetar'); }
+
+function showView(name){
+  if(!VIEW_TITLES[name]) return;
+  if(name === 'usuarios'){ if(!podeVerUsuarios()) name = 'home'; }
+  else if(VIEW_PERMS[name] && !temPermissao(VIEW_PERMS[name])){ name = 'home'; }
+  activeView = name;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('is-active'));
+  $('view-' + name).classList.add('is-active');
+  document.querySelectorAll('.sidebar-link[data-view]').forEach(b => { b.classList.toggle('active', b.dataset.view === name); });
+  $('viewTitle').textContent = VIEW_TITLES[name];
+  if(isMobile()) $('app').classList.remove('sidebar-open');
+  if(name === 'home') renderHome();
+  if(name === 'os' && OS_DATA.length) renderOS();
+  if(name === 'viaturas' && VIATURAS.length) renderViaturas();
+  if(name === 'preventiva'){
+    if(PREV_VIATURAS.length) renderPreventiva(); else loadDataPreventiva();
+    showPrevTab(PREV_TAB_ATUAL || 'painel');
+  }
+  if(name === 'manutencao'){ if(MANUT_EVENTOS.length) renderManut(); showManutTab(activeManutTab || 'registros'); }
+  if(name === 'usuarios') carregarUsuarios();
+}
+function aplicarPermissoesUI(){
+  document.querySelectorAll('.sidebar-link[data-perm]').forEach(b => { b.style.display = temPermissao(b.dataset.perm) ? '' : 'none'; });
+  document.querySelectorAll('[data-perm]').forEach(el => { if(el.classList.contains('sidebar-link')) return; el.style.display = temPermissao(el.dataset.perm) ? '' : 'none'; });
+  $('homeOSSection').style.display = temPermissao('ver_os') ? '' : 'none';
+  $('homeViatSection').style.display = temPermissao('ver_viaturas') ? '' : 'none';
+  $('homeManutSection').style.display = temPermissao('ver_manutencao') ? '' : 'none';
+  const uBtn = $('sidebarUsuariosBtn'); if(uBtn) uBtn.style.display = podeVerUsuarios() ? '' : 'none';
+  const movGroup = $('sidebarMovGroup'); if(movGroup) movGroup.style.display = temPermissao('ver_manutencao') ? '' : 'none';
+  const prevGroup = $('sidebarPrevGroup'); if(prevGroup) prevGroup.style.display = temPermissao('ver_preventiva') ? '' : 'none';
+}
+
+function renderHome(){
+  $('homeUserName').textContent = currentUser || '—';
+  const osTotal = OS_DATA.length;
+  const osPend = OS_DATA.filter(r => r.stage==='Pendente').length;
+  const osAprov = OS_DATA.filter(r => r.stage==='Aprovada').length;
+  const osReav = OS_DATA.filter(r => r.stage==='Reavaliar').length;
+  $('h-os-total').textContent = osTotal; $('h-os-pend').textContent = osPend; $('h-os-aprov').textContent = osAprov; $('h-os-reav').textContent = osReav;
+  const cardReav = $('h-os-reav-card');
+  if(cardReav) cardReav.style.display = (osReav > 0) ? '' : 'none';
+  const vTotal = VIATURAS.length;
+  const vNaoBaix = VIATURAS.filter(v => v.origem !== 'baixada').length;
+  const vDir = VIATURAS.filter(v => v.origem === 'ativa' && ehDiretoria(v.gbm)).length;
+  const vBaix = VIATURAS.filter(v => v.origem === 'baixada').length;
+  $('h-v-total').textContent = vTotal; $('h-v-ativas').textContent = vNaoBaix; $('h-v-dir').textContent = vDir; $('h-v-baix').textContent = vBaix;
+  const mStats = calcularEstatisticasManut();
+  $('h-m-total').textContent = mStats.total;
+  $('h-m-abertos').textContent = mStats.abertos;
+  $('h-m-fechados').textContent = mStats.fechados;
+  const grupos = agruparPorProcesso();
+  let agendAbertos = 0;
+  let alertaCount = 0;
+  Object.values(grupos).forEach(g => {
+    if(g.tipo === TIPO_AGENDAMENTO && g.aberto) agendAbertos++;
+    if(g.aberto && g.entrada){
+      const dt = parseDataManut(g.entrada.data);
+      if(dt && (getNowTime() - dt.getTime()) / 86400000 > 30) alertaCount++;
+    }
+  });
+  $('h-m-agend').textContent = agendAbertos;
+  $('h-m-alerta').textContent = alertaCount;
+  const ult = getUltimaAlteracaoOS();
+  const el = $('homeLastChange');
+  el.innerHTML = ult ? 'Última alteração registrada: <b>' + ult.toLocaleDateString('pt-BR') + ' às ' + ult.toLocaleTimeString('pt-BR') + '</b>' : 'Última alteração registrada: —';
+  $('homeUpdateStatus').textContent = 'OS: ' + $('updateStatus').textContent + ' · Viaturas: ' + $('viatUpdateStatus').textContent + ' · Movimentação: ' + $('manutUpdateStatus').textContent;
+}
+document.querySelectorAll('#view-home .home-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const id = card.querySelector('.value').id;
+    if(id.startsWith('h-os-') && temPermissao('ver_os')) showView('os');
+    else if(id.startsWith('h-v-') && temPermissao('ver_viaturas')) showView('viaturas');
+    else if(id.startsWith('h-m-') && temPermissao('ver_manutencao')) showView('manutencao');
+  });
+});
+
+const TAB_GERAL = 'geral';
+const TAB_MANUTENCAO = '__manutencao__';
+const MANUTENCAO_KEYWORDS = ['manuten'];
+const STAGES = [
+  {key:'Pendente', label:'Pendente', color:'var(--Pendente)'},
+  {key:'Aprovada', label:'Aprovada', color:'var(--Aprovada)'},
+  {key:'Finalizada', label:'Finalizada', color:'var(--Finalizada)'},
+  {key:'Cancelada', label:'Cancelada', color:'var(--Cancelada)'},
+  {key:'Reavaliar', label:'Reavaliação', color:'var(--Reavaliar)'},
+];
+let OS_DATA = []; let activeTab = TAB_GERAL; let isLoadingOS = false; let activeStatusFilter = null; let editingRecordId = null;
+function normalizeViatura(v){ return String(v||'').trim().toUpperCase().replace(/\s+/g,' ').replace(/\s*-\s*/g,'-').replace(/\s+(?=\d)/g,'-'); }
+function slugify(str){ const n = normalizeStr(str||''); return n.replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'outras'; }
+function findField(row, keywords){ const keys = Object.keys(row||{}); for(const k of keys){ const nk = normalizeStr(k); if(keywords.some(kw => nk.includes(kw))) return row[k]; } return ''; }
+function parseStageOS(raw){ const r = normalizeStr(raw||''); if(r.includes('cancelada')) return 'Cancelada'; if(r.includes('entregue')||r.includes('finalizada')||r.includes('concluida')) return 'Finalizada'; if(r.includes('reavali')) return 'Reavaliar'; if(r.includes('aprovada')) return 'Aprovada'; return 'Pendente'; }
+function extractOrcamentos(statusRaw, note, orcadaRaw, qntRaw){
+  const r = normalizeStr(statusRaw||''); const n = normalizeStr(note||''); const o = normalizeStr(orcadaRaw||'');
+  const combined = r+' '+n; let orcamentos = 0;
+  if(qntRaw && String(qntRaw).trim() !== ''){ const parsed = parseInt(qntRaw,10); if(!isNaN(parsed) && parsed > 0) orcamentos = Math.min(parsed,5); }
+  if(orcamentos === 0 && o && ['sim','true','1','x','yes','s','y'].includes(o)) orcamentos = 1;
+  if(orcamentos === 0){ const match = combined.match(/(\d+)\s*\/\s*5/) || combined.match(/(\d+)\s*de\s*5/) || combined.match(/or[çc]ada\s+(\d+)/i); if(match) orcamentos = parseInt(match[1],10); else if(r.includes('orçada')||r.includes('orcada')||r.includes('cotada')) orcamentos = 1; }
+  return Math.min(orcamentos,5);
+}
+function extractPendenteFlags(statusRaw, note){ const c = normalizeStr((statusRaw||'')+' '+(note||'')); return { tabela: c.includes('tabela'), justificativa: c.includes('justificativa') }; }
+function matchesSearchOS(v, q){ return !q || normalizeStr(v).includes(normalizeStr(q)); }
+function isManutencaoNote(note){ const n = normalizeStr(note || ''); return MANUTENCAO_KEYWORDS.some(kw => n.includes(kw)); }
+function stageInfoOS(key){ return STAGES.find(s=>s.key===key) || STAGES[0]; }
+function saveLocalDataOS(){ try{ localStorage.setItem(STORAGE_KEY_OS, JSON.stringify(OS_DATA)); }catch(e){} }
+function loadLocalDataOS(){ try{ const raw = localStorage.getItem(STORAGE_KEY_OS); if(raw){ const parsed = JSON.parse(raw); if(Array.isArray(parsed) && parsed.length){ OS_DATA = parsed; return true; } } }catch(e){} return false; }
+function showSkeletonOS(){ const s=$('osSkeleton'); if(s) s.style.display='block'; }
+function hideSkeletonOS(){ const s=$('osSkeleton'); if(s) s.style.display='none'; }
+function processCsvText(csvText){
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim() !== '');
+  let headerIndex = -1;
+  for(let i = 0; i < lines.length; i++){ if(lines[i].toLowerCase().includes('viatura') && lines[i].toLowerCase().includes('os nº')){ headerIndex = i; break; } }
+  if(headerIndex === -1){ OS_DATA=[]; return; }
+  const cleanCsv = lines.slice(headerIndex).join('\n');
+  const parsed = Papa.parse(cleanCsv, { header:true, skipEmptyLines:true });
+  OS_DATA = mapRowsToData(parsed.data || []);
+  saveLocalDataOS();
+}
+function mapRowsToData(rows){
+  return rows.map((row,i)=>{
+    const rawCategoria = findField(row,['categoria']) || row['Categoria'] || '';
+    const categoriaLabel = (rawCategoria||'').toString().trim() || 'Outras';
+    const catKey = slugify(categoriaLabel);
+    const osField = findField(row,['os','os n','os nº','numero os','numero']) || '';
+    const viatura = findField(row,['viatura','veiculo','viagem']) || row['Viatura'] || row['Veículo'] || '';
+    const status = findField(row,['status','situacao','situação']) || row['Status'] || '';
+    const note = findField(row,['observa','observ','obs','nota','comentario']) || row['Observações'] || '';
+    const empresa = findField(row,['oficina','empresa']) || row['Oficina/Empresa'] || '';
+    const orcadaRaw = findField(row,['orçada','orcada']) || row['orçada'] || row['Orçada'] || '';
+    const qntRaw = findField(row,['qnt','quantidade','qtd','quant']) || row['qnt'] || '';
+    const distribuida = findField(row,['distribuida','distribuída']) || row['Distribuída'] || row['Distribuida'] || '';
+    const qtdDist = findField(row,['qtd distrib','quantidade distrib','distribuicoes','distribuições','qtd dist']) || row['Qtd Distribuições'] || '';
+    const alteradoPor = findField(row,['alterado por']) || row['Alterado por'] || '';
+    const ultimaAlt = findField(row,['ultima alteracao','última alteração','ultima alteração','última alteracao']) || row['Última alteração'] || '';
+    const stage = parseStageOS(status);
+    const orcamentos = extractOrcamentos(status, note, orcadaRaw, qntRaw);
+    const flags = (stage==='Pendente') ? extractPendenteFlags(status, note) : {tabela:false, justificativa:false};
+    return { id:'sheet-'+i, v:normalizeViatura(viatura), os:(osField||'').toString().trim(), category:categoriaLabel, catKey, stage, orcamentos, distribuida:(distribuida||'').toString().trim(), qtdDist:(qtdDist||'').toString().trim(), tabela:flags.tabela, justificativa:flags.justificativa, empresa:(empresa||'').toString().trim(), note:(note||'').toString().trim(), alteradoPor:(alteradoPor||'').toString().trim(), ultimaAlt:(ultimaAlt||'').toString().trim() };
+  }).filter(r=>r.v);
+}
+async function fetchCsv(url){ const response = await fetch(url); if(!response.ok) throw new Error('HTTP '+response.status); return await response.text(); }
+async function loadDataOS(){
+  if(isLoadingOS) return; isLoadingOS = true; showSkeletonOS();
+  const CACHE_KEY_OS = 'deman_cache_os_v2'; const CACHE_TTL = 15 * 60 * 1000;
+  try{ const raw = sessionStorage.getItem(CACHE_KEY_OS); if(raw){ const p = JSON.parse(raw); if(p && Array.isArray(p.data) && (Date.now() - p.ts) < CACHE_TTL){ OS_DATA = p.data; hideSkeletonOS(); isLoadingOS = false; renderLastUpdateOS(); if(activeView === 'os') renderOS(); if(activeView === 'home') renderHome(); } } }catch(e){}
+  try{
+    const r = await apiOS('lerCSV');
+    if(r.ok && r.header && r.linhas){
+      const rows = r.linhas.map(arr => { const o = {}; r.header.forEach((h, i) => o[h] = arr[i]); return o; });
+      OS_DATA = mapRowsToData(rows); saveLocalDataOS();
+      try{ sessionStorage.setItem(CACHE_KEY_OS, JSON.stringify({ ts: Date.now(), data: OS_DATA })); }catch(e){}
+      $('errorArea').style.display = 'none';
+    } else { throw new Error(r.error || 'lerCSV falhou'); }
+  }catch(err){
+    const loaded = loadLocalDataOS(); if(!loaded){ OS_DATA = []; $('errorArea').style.display = 'block'; }
+  }
+  hideSkeletonOS(); isLoadingOS = false; renderLastUpdateOS();
+  if(activeView === 'os') renderOS(); if(activeView === 'home') renderHome();
+}
+async function updateOSStatus(osNumber, newStatus, viatura){ try{ const r = await apiOS('atualizarStatus', { os:osNumber, status:newStatus, viatura }); if(r && r.ok === true){ saveLocalDataOS(); try{ sessionStorage.removeItem('deman_cache_os_v2'); }catch(e){} return true; } return false; }catch(err){ return false; } }
+async function createOSInSheet(data){ try{ const r = await apiOS('criarOS', data); if(r && r.ok === true){ try{ sessionStorage.removeItem('deman_cache_os_v2'); }catch(e){} return true; } return false; }catch(err){ return false; } }
+async function editOSInSheet(osOriginal, viaturaOriginal, data){ try{ const r = await apiOS('editarOS', Object.assign({ osOriginal, viaturaOriginal }, data)); if(r && r.ok === true){ try{ sessionStorage.removeItem('deman_cache_os_v2'); }catch(e){} return true; } return false; }catch(err){ return false; } }
+function getUltimaAlteracaoOS(){
+  let maior = null;
+  OS_DATA.forEach(r => { if(!r.ultimaAlt) return; const m = String(r.ultimaAlt).match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/); if(!m) return; const d = new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]); if(!maior || d > maior) maior = d; });
+  return maior;
+}
+function renderLastUpdateOS(){
+  const agora = new Date();
+  if($('updateStatus')) $('updateStatus').textContent = 'Dados consultados em '+agora.toLocaleDateString('pt-BR')+' às '+agora.toLocaleTimeString('pt-BR');
+  if($('lastChange')){ const ult = getUltimaAlteracaoOS(); $('lastChange').innerHTML = ult ? 'Última alteração registrada: <b>'+ult.toLocaleDateString('pt-BR')+' às '+ult.toLocaleTimeString('pt-BR')+'</b>' : 'Última alteração registrada: —'; }
+}
+function renderLegendOS(){ $('legend').innerHTML = STAGES.map(s=>`<span><span class="dot" style="background:${s.color}"></span>${s.label}</span>`).join('') + `<span><span class="dot" style="background:var(--semos)"></span>Sem OS</span>`; }
+function getEventosOS(){
+  const mapa = new Map();
+  OS_DATA.forEach(r => { const original = (r.note || '').trim(); if(!original) return; if(isManutencaoNote(original)) return; const chave = normalizeStr(original); if(!mapa.has(chave)) mapa.set(chave, original); });
+  return Array.from(mapa.values()).sort((a,b) => a.localeCompare(b));
+}
+function renderTabsOS(){
+  const eventos = getEventosOS(); const container = $('tabsContainer');
+  let html = `<button class="tab ${activeTab===TAB_GERAL?'active':''}" data-tab="${TAB_GERAL}">Visão Geral</button>`;
+  html += `<button class="tab ${activeTab===TAB_MANUTENCAO?'active':''}" data-tab="${TAB_MANUTENCAO}">Manutenção</button>`;
+  html += eventos.map(ev => `<button class="tab ${activeTab===ev?'active':''}" data-tab="${escapeAttr(ev)}">${escapeHtml(ev)}</button>`).join('');
+  container.innerHTML = html;
+  container.querySelectorAll('.tab').forEach(t => { t.addEventListener('click', () => { activeTab = t.dataset.tab; renderOS(); }); });
+}
+function getDadosFiltradosOS(eventoFiltro){
+  const q = $('osSearch').value.trim().toLowerCase();
+  let dados = OS_DATA;
+  if(activeStatusFilter) dados = dados.filter(r => r.stage === activeStatusFilter);
+  else dados = dados.filter(r => r.stage !== 'Finalizada' && r.stage !== 'Cancelada');
+  if(eventoFiltro === TAB_MANUTENCAO) dados = dados.filter(r => isManutencaoNote(r.note));
+  else if(eventoFiltro) dados = dados.filter(r => normalizeStr(r.note).includes(normalizeStr(eventoFiltro)));
+  if(q) dados = dados.filter(r => matchesSearchOS(r.v, q) || (r.os && r.os.toString().toLowerCase().includes(q)) || normalizeStr(r.category).includes(normalizeStr(q)));
+  return dados;
+}
+
+function renderGeralOS(eventoFiltro){
+  const dados = getDadosFiltradosOS(eventoFiltro);
+  const podeStatus = temPermissao('os_status'); const podeEditar = temPermissao('os_editar');
+  const allVehicles = Array.from(new Set(dados.map(r => (r.v||'').trim()).filter(Boolean))).sort();
+  if(allVehicles.length === 0){ $('osContent').innerHTML = '<div class="empty-col">Nenhuma viatura encontrada</div>'; return; }
+  const familyOf = v => v.split('-')[0].toUpperCase();
+  const families = {};
+  allVehicles.forEach(v => { const f = familyOf(v); (families[f] = families[f] || []).push(v); });
+  const pencilSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>`;
+  const html = Object.keys(families).sort().map(fam => {
+    const vehicles = families[fam].sort((a,b) => a.localeCompare(b));
+    const cards = vehicles.map(v => {
+      const osList = dados.filter(r => r.v === v);
+      const statusColors = osList.map(r => stageInfoOS(r.stage).color);
+      const uniqueColors = [...new Set(statusColors)];
+      let borderStyle = 'var(--border)';
+      if(uniqueColors.length === 1) borderStyle = uniqueColors[0];
+      else if(uniqueColors.length > 1){ const stops = uniqueColors.map((color, idx) => `${color} ${Math.round(idx/(uniqueColors.length-1)*100)}%`).join(', '); borderStyle = `linear-gradient(135deg, ${stops})`; }
+      const osEntries = osList.map(r => {
+        const st = stageInfoOS(r.stage);
+        const qnt = r.orcamentos > 0 ? r.orcamentos : null;
+        const destacar = (r.stage === 'Pendente' && r.orcamentos >= 3);
+        const orcClass = destacar ? 'orc-alto' : '';
+        const orcBadge = (qnt !== null) ? `<span class="badge-orc">$ ${qnt}</span>` : '';
+        const stageControl = podeStatus
+          ? `<select class="stage-select" data-id="${escapeAttr(r.id)}" data-os="${escapeAttr(r.os)}">${STAGES.map(s=>`<option value="${s.key}" ${s.key===r.stage?'selected':''}>${s.label}</option>`).join('')}</select>`
+          : `<span class="stage-static">${st.label}</span>`;
+        const editBtn = podeEditar ? `<button class="edit-btn" data-edit-id="${escapeAttr(r.id)}" title="Editar OS ${escapeAttr(r.os)}">${pencilSvg}</button>` : '';
+        const metaParts = [`<span class="os-num">OS ${escapeHtml(r.os)}</span>`];
+        if(r.orcamentos > 0) metaParts.push(`<span>Orçada · Qnt ${r.orcamentos}</span>`); else metaParts.push(`<span>Não orçada</span>`);
+        if(r.distribuida) metaParts.push(`<span>Distribuída: ${escapeHtml(r.distribuida)}${r.qtdDist ? ' ('+escapeHtml(r.qtdDist)+')' : ''}</span>`);
+        if(r.empresa) metaParts.push(`<span>${escapeHtml(r.empresa)}</span>`);
+        const metaHtml = metaParts.join('<span class="sep">·</span>');
+        return `<div class="svc-row ${orcClass}" style="border-left-color:${st.color}">
+          ${editBtn}
+          <div class="svc-left">
+            <div class="svc-label">${escapeHtml(r.category)}${orcBadge}</div>
+            <div class="svc-meta">${metaHtml}</div>
+          </div>
+          <div class="svc-right">${stageControl}</div>
+        </div>`;
+      }).join('');
+      return `<div class="veh-card" style="border: 2px solid transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, ${borderStyle} border-box;"><div class="veh-name">${escapeHtml(v)}</div>${osEntries}</div>`;
+    }).join('');
+    return `<details class="family" open><summary><span class="fam-name">${fam} <span class="fam-count">${vehicles.length} viatura${vehicles.length>1?'s':''}</span></span></summary><div class="veh-grid">${cards}</div></details>`;
+  }).join('');
+  $('osContent').innerHTML = html;
+  if(podeStatus){
+    document.querySelectorAll('#view-os .stage-select').forEach(sel => {
+      sel.addEventListener('change', async e => {
+        const rec = OS_DATA.find(r => r.id === e.target.dataset.id); if(!rec) return;
+        const oldStage = rec.stage; const newStage = e.target.value; rec.stage = newStage; renderOS();
+        const ok = await updateOSStatus(rec.os, newStage, rec.v);
+        if(!ok){ rec.stage = oldStage; alert('O status não pôde ser atualizado. Revertido.'); renderOS(); }
+      });
+    });
+  }
+  if(podeEditar){
+    document.querySelectorAll('#view-os .edit-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const rec = OS_DATA.find(r => r.id === btn.dataset.editId); if(!rec) return;
+        if(confirm(`Deseja realmente editar a OS ${rec.os} da viatura ${rec.v}?`)) openEditModal(rec.id);
+      });
+    });
+  }
+}
+function renderStatsOS(){
+  const total = new Set(OS_DATA.map(r => (r.v||'').trim()).filter(Boolean)).size;
+  const stats = [
+    {n: total, l:'Viaturas com OS', filter:null, isTotal:true},
+    {n: OS_DATA.filter(r=>r.stage==='Pendente').length, l:'Pendentes', filter:'Pendente'},
+    {n: OS_DATA.filter(r=>r.stage==='Aprovada').length, l:'Aprovadas', filter:'Aprovada'},
+    {n: OS_DATA.filter(r=>r.stage==='Finalizada').length, l:'Finalizadas', filter:'Finalizada'},
+    {n: OS_DATA.filter(r=>r.stage==='Cancelada').length, l:'Canceladas', filter:'Cancelada'},
+    {n: OS_DATA.filter(r=>r.stage==='Reavaliar').length, l:'Reavaliações', filter:'Reavaliar'},
+  ];
+  $('stats').innerHTML = stats.map(s => {
+    const isActive = (s.isTotal && activeStatusFilter === null) || (s.filter && activeStatusFilter === s.filter);
+    const classes = ['stat']; if(s.isTotal) classes.push('total-stat'); if(isActive) classes.push('active-filter');
+    const dataAttr = s.isTotal ? 'data-total="1"' : `data-filter="${s.filter}"`;
+    return `<div class="${classes.join(' ')}" ${dataAttr}><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`;
+  }).join('');
+  document.querySelectorAll('#view-os .stat').forEach(card => {
+    card.addEventListener('click', () => {
+      if(card.dataset.total === '1') activeStatusFilter = null;
+      else { const f = card.dataset.filter; activeStatusFilter = (activeStatusFilter === f) ? null : f; }
+      renderOS();
+    });
+  });
+}
+function renderOS(){
+  if(activeView !== 'os') return;
+  renderLegendOS(); renderStatsOS(); renderTabsOS(); renderLastUpdateOS();
+  const clearBtn = $('clearFilterBtn');
+  if(clearBtn){
+    const hasSearch = ($('osSearch') && $('osSearch').value.trim());
+    clearBtn.style.display = (activeStatusFilter || hasSearch) ? 'inline-block' : 'none';
+  }
+  if(activeTab === TAB_MANUTENCAO) renderGeralOS(TAB_MANUTENCAO);
+  else if(activeTab === TAB_GERAL) renderGeralOS(null);
+  else renderGeralOS(activeTab);
+}
+
+let repFiltroStatus       = '';
+let repFiltroOficina      = [];
+let repFiltroOrcada       = '';
+let repFiltroDistribuida  = '';
+
+let _repOficinasLista = [];
+function repOficinaSync(){
+  const panel = $('repFilterOficinaPanel'), btn = $('repFilterOficinaBtn');
+  if(panel){
+    panel.querySelectorAll('input[value]').forEach(cb => { cb.checked = repFiltroOficina.includes(cb.value); });
+    const td = panel.querySelector('input[data-todas]'); if(td) td.checked = repFiltroOficina.length === 0;
+  }
+  if(btn){
+    const n = repFiltroOficina.length;
+    btn.textContent = n === 0 ? 'Todas' : (n === 1 ? repFiltroOficina[0] : n + ' selecionadas');
+    btn.title = repFiltroOficina.join(', ');
+    btn.classList.toggle('has-sel', n > 0);
+  }
+}
+function repOficinaRenderPanel(){
+  const panel = $('repFilterOficinaPanel'); if(!panel) return;
+  panel.innerHTML = '<label class="ms-item"><input type="checkbox" data-todas="1"> <b>Todas</b></label>' +
+    _repOficinasLista.map(o => `<label class="ms-item"><input type="checkbox" value="${escapeAttr(o)}"> ${escapeHtml(o)}</label>`).join('');
+  panel.classList.remove('open');
+  repOficinaSync();
+}
+function repPopularSelects(dados){
+  const status = Array.from(new Set(dados.map(r => r.stage).filter(Boolean))).sort();
+  _repOficinasLista = Array.from(new Set(dados.map(r => (r.empresa||'').trim()).filter(Boolean))).sort();
+  const selS = $('repFilterStatus'); if(!selS) return;
+  selS.innerHTML = '<option value="">Todos</option>' + status.map(s => {
+    const info = STAGES.find(x => x.key === s); const label = info ? info.label : s;
+    const sel = (repFiltroStatus === s) ? ' selected' : '';
+    return `<option value="${escapeAttr(s)}"${sel}>${escapeHtml(label)}</option>`;
+  }).join('');
+  repOficinaRenderPanel();
+  const selOrc = $('repFilterOrcada'); if(selOrc) selOrc.value = repFiltroOrcada;
+}
+function repAplicarFiltros(dados){
+  return dados.filter(r => {
+    if(repFiltroStatus && r.stage !== repFiltroStatus) return false;
+    if(repFiltroOficina.length && !repFiltroOficina.includes((r.empresa||'').trim())) return false;
+    if(repFiltroOrcada === 'Sim' && !(r.orcamentos > 0)) return false;
+    if(repFiltroOrcada === 'Não' && (r.orcamentos > 0)) return false;
+    if(repFiltroDistribuida === 'Sim' && r.distribuida !== 'Sim') return false;
+    if(repFiltroDistribuida === 'Não' && r.distribuida === 'Sim') return false;
+    return true;
+  });
+}
+function repRenderKpis(dados){
+  const total = dados.length;
+  const pend = dados.filter(r => r.stage === 'Pendente').length;
+  const aprov = dados.filter(r => r.stage === 'Aprovada').length;
+  const final = dados.filter(r => r.stage === 'Finalizada').length;
+  const qntTotal = dados.reduce((sum, r) => sum + (r.orcamentos > 0 ? r.orcamentos : 0), 0);
+  const distribuidas = dados.filter(r => r.distribuida === 'Sim').length;
+  const qtdDistTotal = dados.reduce((sum, r) => { if(r.distribuida !== 'Sim') return sum; const n = parseInt(r.qtdDist, 10); return sum + (isNaN(n) ? 0 : n); }, 0);
+  $('reportKpis').innerHTML = `
+    <div class="report-kpi kpi-total"><div class="kpi-label">Total</div><div class="kpi-value">${total}</div></div>
+    <div class="report-kpi kpi-pend"><div class="kpi-label">Pendentes</div><div class="kpi-value">${pend}</div></div>
+    <div class="report-kpi kpi-aprov"><div class="kpi-label">Aprovadas</div><div class="kpi-value">${aprov}</div></div>
+    <div class="report-kpi kpi-final"><div class="kpi-label">Finalizadas</div><div class="kpi-value">${final}</div></div>
+    <div class="report-kpi kpi-qnt"><div class="kpi-label">Qnt orçada</div><div class="kpi-value">${qntTotal}</div></div>
+    <div class="report-kpi kpi-dist"><div class="kpi-label">Distribuídas</div><div class="kpi-value">${distribuidas}${qtdDistTotal > 0 ? ' <span style="font-size:14px;color:var(--text-dim);">/ '+qtdDistTotal+'</span>' : ''}</div></div>
+  `;
+}
+function repRenderTabela(){
+  const dadosOriginais = getDadosFiltradosOS(activeTab === TAB_GERAL ? null : activeTab);
+  const dados = repAplicarFiltros(dadosOriginais);
+  repRenderKpis(dados);
+  const filtros = [];
+  if(activeTab === TAB_GERAL) filtros.push('Visão Geral');
+  else if(activeTab === TAB_MANUTENCAO) filtros.push('Manutenção');
+  else filtros.push('Evento: '+activeTab);
+  filtros.push(activeStatusFilter ? 'Status (card): '+activeStatusFilter : 'Status (card): Todos');
+  const q = $('osSearch').value.trim(); if(q) filtros.push('Busca: "'+q+'"');
+  const partes = [];
+  if(repFiltroStatus) partes.push('Status: ' + ((STAGES.find(x => x.key === repFiltroStatus)||{}).label || repFiltroStatus));
+  if(repFiltroOficina.length) partes.push('Oficina: ' + repFiltroOficina.join(' + '));
+  if(repFiltroOrcada) partes.push('Orçada: ' + repFiltroOrcada);
+  if(repFiltroDistribuida) partes.push('Distribuída: ' + repFiltroDistribuida);
+  $('repFilterResumo').innerHTML = '<b>Base:</b> ' + filtros.map(escapeHtml).join(' · ') + (partes.length ? ' · <b>Filtros:</b> ' + partes.map(escapeHtml).join(' · ') : '') + ' · <b>Exibindo:</b> ' + dados.length + ' de ' + dadosOriginais.length + ' OS';
+  const ordenado = dados.slice().sort((a,b) => a.v.localeCompare(b.v) || a.os.localeCompare(b.os));
+  $('reportBody').innerHTML = ordenado.length === 0
+    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhum registro encontrado</td></tr>'
+    : ordenado.map(r => {
+        const st = stageInfoOS(r.stage);
+        const distTxt = r.distribuida === 'Sim' ? 'Sim' : (r.distribuida === 'Não' ? 'Não' : '—');
+        const qtdTxt = (r.distribuida === 'Sim' && r.qtdDist) ? r.qtdDist : '—';
+        return `<tr>
+          <td class="v">${escapeHtml(r.v)}</td>
+          <td class="os">${escapeHtml(r.os)}</td>
+          <td>${escapeHtml(r.category)}</td>
+          <td class="status" style="color:${st.color};">● ${st.label}</td>
+          <td>${r.orcamentos > 0 ? 'Sim' : 'Não'}</td>
+          <td>${r.orcamentos > 0 ? r.orcamentos : '—'}</td>
+          <td>${escapeHtml(distTxt)}</td>
+          <td style="text-align:center;">${escapeHtml(qtdTxt)}</td>
+          <td>${escapeHtml(r.empresa || '—')}</td>
+        </tr>`;
+      }).join('');
+}
+function abrirRelatorioOS(){
+  repFiltroStatus = ''; repFiltroOficina = []; repFiltroOrcada = ''; repFiltroDistribuida = '';
+  const dados = getDadosFiltradosOS(activeTab === TAB_GERAL ? null : activeTab);
+  repPopularSelects(dados);
+  const selS = $('repFilterStatus'); const selOrc = $('repFilterOrcada'); const selDist = $('repFilterDistribuida'); const btnLimpar = $('repFilterLimpar');
+  const msBtn = $('repFilterOficinaBtn'); const msPanel = $('repFilterOficinaPanel');
+  if(selS && !selS.dataset.bound){ selS.dataset.bound = '1'; selS.addEventListener('change', () => { repFiltroStatus = selS.value; repRenderTabela(); }); }
+  if(msBtn && msPanel && !msBtn.dataset.bound){
+    msBtn.dataset.bound = '1';
+    msBtn.addEventListener('click', e => { e.stopPropagation(); msPanel.classList.toggle('open'); });
+    msPanel.addEventListener('click', e => e.stopPropagation());
+    msPanel.addEventListener('change', e => {
+      const cb = e.target; if(!cb || cb.type !== 'checkbox') return;
+      repFiltroOficina = cb.dataset.todas ? [] : Array.from(msPanel.querySelectorAll('input[value]:checked')).map(x => x.value);
+      repOficinaSync();
+      repRenderTabela();
+    });
+    document.addEventListener('click', () => msPanel.classList.remove('open'));
+  }
+  if(selOrc && !selOrc.dataset.bound){ selOrc.dataset.bound = '1'; selOrc.addEventListener('change', () => { repFiltroOrcada = selOrc.value; repRenderTabela(); }); }
+  if(selDist && !selDist.dataset.bound){ selDist.dataset.bound = '1'; selDist.addEventListener('change', () => { repFiltroDistribuida = selDist.value; repRenderTabela(); }); }
+  if(btnLimpar && !btnLimpar.dataset.bound){
+    btnLimpar.dataset.bound = '1';
+    btnLimpar.addEventListener('click', () => {
+      repFiltroStatus = ''; repFiltroOficina = []; repFiltroOrcada = ''; repFiltroDistribuida = '';
+      if(selS) selS.value = ''; if(selOrc) selOrc.value = ''; if(selDist) selDist.value = '';
+      repOficinaSync();
+      repRenderTabela();
+    });
+  }
+  const agora = new Date();
+  $('reportMeta').innerHTML = 'Emitido em '+agora.toLocaleDateString('pt-BR')+' às '+agora.toLocaleTimeString('pt-BR')+'<br>Por: <b style="color:var(--amber);">'+escapeHtml(currentUser||'—')+'</b>';
+  repRenderTabela();
+  _abrirReportModal('reportModal');
+}
+
+const edStageSel = $('ed-stage'); edStageSel.innerHTML = STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
+
+function atualizarCascataOrcada(prefixo){
+  const selOrc = $(prefixo + '-orcada'); if(!selOrc) return;
+  const orcadaSim = selOrc.value === 'Sim';
+  const selDist = $(prefixo + '-distribuida');
+  if(selDist){ selDist.style.display = orcadaSim ? '' : 'none'; if(!orcadaSim) selDist.value = ''; }
+  const lblDist = $(prefixo + '-dist-label'); if(lblDist) lblDist.style.display = orcadaSim ? '' : 'none';
+  const distSim = selDist && selDist.value === 'Sim';
+  const inpQtd = $(prefixo + '-qtd-dist'); if(inpQtd){ inpQtd.style.display = distSim ? '' : 'none'; if(!distSim) inpQtd.value = ''; }
+  const lblQtd = $(prefixo + '-qtd-dist-label'); if(lblQtd) lblQtd.style.display = distSim ? '' : 'none';
+}
+$('af-orcada').addEventListener('change', () => atualizarCascataOrcada('af'));
+$('af-distribuida').addEventListener('change', () => atualizarCascataOrcada('af'));
+$('ed-orcada').addEventListener('change', () => atualizarCascataOrcada('ed'));
+$('ed-distribuida').addEventListener('change', () => atualizarCascataOrcada('ed'));
+
+function openEditModal(recordId){
+  if(!temPermissao('os_editar')){ alert('Você não tem permissão para editar.'); return; }
+  const rec = OS_DATA.find(r => r.id === recordId); if(!rec) return;
+  editingRecordId = recordId;
+  $('ed-v').value = rec.v; $('ed-os').value = rec.os; $('ed-cat').value = rec.category;
+  $('ed-empresa').value = rec.empresa || ''; $('ed-stage').value = rec.stage;
+  $('ed-orcada').value = rec.orcamentos > 0 ? 'Sim' : 'Não'; $('ed-qnt').value = rec.orcamentos > 0 ? rec.orcamentos : '';
+  $('ed-distribuida').value = rec.distribuida || '';
+  $('ed-qtd-dist').value = rec.qtdDist || '';
+  $('ed-note').value = rec.note || '';
+  atualizarCascataOrcada('ed');
+  $('editModal').style.display = 'flex'; $('ed-v').focus();
+}
+function closeEditModal(){ editingRecordId = null; $('editModal').style.display = 'none'; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VIATURAS
+// ═══════════════════════════════════════════════════════════════════════════
+const MOTIVOS_BAIXA = ['Sinistro','Manutenção'];
+const CACHE_KEY = 'deman_cache_viaturas_v1';
+let VIATURAS = []; let LOCAIS = []; let LOCAIS_DIRETORIAS = []; let activeFilter = 'todas';
+function ehDiretoria(local){ if(!local) return false; const l = normalizeStr(local); return LOCAIS_DIRETORIAS.some(d => normalizeStr(d) === l); }
+function salvarCache(){ try{ sessionStorage.setItem(CACHE_KEY, JSON.stringify({ viaturas: VIATURAS, locais: LOCAIS, locaisDiretorias: LOCAIS_DIRETORIAS })); }catch(e){} }
+function carregarCache(){ try{ const raw = sessionStorage.getItem(CACHE_KEY); if(!raw) return false; const d = JSON.parse(raw); if(!d || !Array.isArray(d.viaturas)) return false; VIATURAS = d.viaturas; LOCAIS = Array.isArray(d.locais) ? d.locais : []; LOCAIS_DIRETORIAS = Array.isArray(d.locaisDiretorias) ? d.locaisDiretorias : []; return true; }catch(e){ return false; } }
+async function loadDataViaturas(){
+  const upd = $('viatUpdateStatus');
+  try{
+    upd.textContent = 'Atualizando…';
+    const r = await apiViaturas('listarViaturas');
+    if(!r.ok){ upd.textContent = 'Falha: '+(r.error||'desconhecido'); if(VIATURAS.length === 0 && activeView === 'viaturas') renderViaturas(); return; }
+    VIATURAS = Array.isArray(r.viaturas) ? r.viaturas : [];
+    LOCAIS = Array.isArray(r.locais) ? r.locais : [];
+    LOCAIS_DIRETORIAS = Array.isArray(r.locaisDepartamentais) ? r.locaisDepartamentais : [];
+    salvarCache();
+    upd.textContent = 'Atualizado em '+new Date().toLocaleTimeString('pt-BR');
+    if(activeView === 'viaturas') renderViaturas(); if(activeView === 'home') renderHome();
+  }catch(err){ console.error(err); upd.textContent = 'Erro: '+err.message; if(VIATURAS.length === 0 && activeView === 'viaturas') renderViaturas(); }
+}
+function renderSummaryViaturas(){
+  const total = VIATURAS.length;
+  const naoBaixadas = VIATURAS.filter(v => v.origem !== 'baixada').length;
+  const reservas = VIATURAS.filter(v => v.origem === 'reserva').length;
+  const baixadas = VIATURAS.filter(v => v.origem === 'baixada').length;
+  const diretorias = VIATURAS.filter(v => v.origem === 'ativa' && ehDiretoria(v.gbm)).length;
+  const cards = [
+    { key:'todas', label:'Total geral', value:total, cls:'total' },
+    { key:'ativas', label:'Ativas', value:naoBaixadas, cls:'ativas' },
+    { key:'reservas', label:'Reservas (DEMAN)', value:reservas, cls:'reservas' },
+    { key:'baixadas', label:'Baixadas', value:baixadas, cls:'baixadas' },
+    { key:'diretorias', label:'Diretorias', value:diretorias, cls:'diretorias' }
+  ];
+  $('summaryCards').innerHTML = cards.map(c => { const active = activeFilter === c.key; return `<div class="summary-card ${c.cls} ${active?'active-filter':''}" data-filter="${c.key}"><div class="label">${c.label}</div><div class="value">${c.value}</div></div>`; }).join('');
+  document.querySelectorAll('#view-viaturas .summary-card').forEach(card => { card.addEventListener('click', () => { const k = card.dataset.filter; activeFilter = (activeFilter === k) ? 'todas' : k; renderViaturas(); }); });
+  const clearBtn = $('viatClearFilterBtn');
+  if(clearBtn){
+    const hasSearch = ($('viatSearch') && $('viatSearch').value.trim());
+    clearBtn.style.display = (activeFilter !== 'todas' || hasSearch) ? 'inline-block' : 'none';
+  }
+}
+
+function mapaProcViaturaAbertos(){
+  const grupos = agruparPorProcesso();
+  const mapa = {};
+  Object.values(grupos).forEach(g => {
+    if(g.tipo !== TIPO_VIATURA || !g.aberto) return;
+    const pfx = normalizarPrefixoManut(g.viatura);
+    if(!mapa[pfx]) mapa[pfx] = { procs: [], locais: new Set() };
+    mapa[pfx].procs.push(g);
+    const local = (g.ultimo && g.ultimo.local) || (g.entrada && g.entrada.local) || '';
+    if(local) mapa[pfx].locais.add(local.toUpperCase());
+  });
+  Object.values(mapa).forEach(m => {
+    m.locaisArray = Array.from(m.locais);
+    m.multiLocal = m.locaisArray.length >= 2;
+  });
+  return mapa;
+}
+
+function htmlVehRow(v, localCard, mapaProc){
+  const podeGerenciar = temPermissao('viat_gerenciar');
+  const pfx = normalizarPrefixoManut(v.prefixo);
+  const info = mapaProc[pfx];
+  const multiLocal = info && info.multiLocal;
+  const localAtualUpper = String(localCard||'').toUpperCase();
+  let multiBadge = '';
+  let multiOutros = '';
+  let multiBtn = '';
+  if(multiLocal){
+    const idx = info.locaisArray.indexOf(localAtualUpper) + 1;
+    const total = info.locaisArray.length;
+    const outrosLocais = info.locaisArray.filter(l => l !== localAtualUpper);
+    multiBadge = `<span class="multi-badge">🟡 Em manutenção (${idx} de ${total})</span>`;
+    if(outrosLocais.length > 0){
+      multiOutros = `<div class="multi-outros">📍 Também em: ${escapeHtml(outrosLocais.join(', '))}</div>`;
+    }
+    multiBtn = `<button class="multi-btn" data-action="verProcessos" data-prefixo="${escapeAttr(v.prefixo)}">Ver todos os processos (${total})</button>`;
+  }
+
+  if(v.origem === 'baixada'){
+    return `<div class="veh-row"><div class="veh-row-top"><span class="veh-row-prefix">${escapeHtml(v.prefixo)}</span>${v.gbm ? `<span class="veh-row-info">Era ${escapeHtml(v.gbm)}</span>` : ''}</div>${v.motivo ? `<div class="veh-row-info" style="text-align:left;">Motivo: ${escapeHtml(v.motivo)}</div>` : ''}${v.data ? `<div class="veh-row-info" style="text-align:left;">${escapeHtml(v.data)}</div>` : ''}${podeGerenciar ? `<div class="veh-row-actions"><button class="btn ghost" data-action="reativar" data-prefixo="${escapeAttr(v.prefixo)}">Reativar</button><button class="btn ghost" data-action="moverReserva" data-prefixo="${escapeAttr(v.prefixo)}">→ Reserva</button></div>` : ''}</div>`;
+  }
+  if(v.origem === 'reserva'){
+    return `<div class="veh-row"><div class="veh-row-top"><span class="veh-row-prefix">${escapeHtml(v.prefixo)}</span>${multiBadge}</div>${multiOutros}${podeGerenciar ? `<div class="veh-row-actions"><button class="btn ghost" data-action="permutar" data-prefixo="${escapeAttr(v.prefixo)}" data-origem="reserva" data-gbm="">→ Ativa</button><button class="btn ghost danger" data-action="baixar" data-prefixo="${escapeAttr(v.prefixo)}" data-gbm="" data-origem="reserva">Baixar</button></div>` : ''}${multiBtn}</div>`;
+  }
+  return `<div class="veh-row"><div class="veh-row-top"><span class="veh-row-prefix">${escapeHtml(v.prefixo)}</span>${multiBadge}</div>${multiOutros}${podeGerenciar ? `<div class="veh-row-actions"><button class="btn ghost" data-action="mudar" data-prefixo="${escapeAttr(v.prefixo)}">Mudar local</button><button class="btn ghost" data-action="permutar" data-prefixo="${escapeAttr(v.prefixo)}" data-origem="ativa" data-gbm="${escapeAttr(v.gbm||'')}">→ Reserva</button><button class="btn ghost danger" data-action="baixar" data-prefixo="${escapeAttr(v.prefixo)}" data-gbm="${escapeAttr(v.gbm||'')}" data-origem="ativa">Baixar</button></div>` : ''}${multiBtn}</div>`;
+}
+
+function htmlLocalCard(nome, viaturas, tipo, mapaProc){
+  const qtd = viaturas.length; const label = qtd === 1 ? '1 viatura' : qtd+' viaturas';
+  const labelNome = (nome === 'CSMP') ? 'CSMP (Almoxarifado)' : nome;
+  const bodyHtml = qtd === 0 ? `<div class="local-empty">Nenhuma viatura neste local</div>` : viaturas.sort((a,b)=>a.prefixo.localeCompare(b.prefixo)).map(v => htmlVehRow(v, nome, mapaProc)).join('');
+  return `<div class="local-card ${tipo||''}"><div class="local-head"><div class="local-name">${escapeHtml(labelNome)}</div><div class="local-count">${label}</div></div><div class="local-body">${bodyHtml}</div></div>`;
+}
+
+function renderLocalGridViaturas(){
+  const q = normalizeStr($('viatSearch').value); const container = $('localGrid');
+  const matchesQ = v => !q || normalizeStr(v.prefixo).includes(q) || normalizeStr(v.gbm).includes(q);
+  const mapaProc = mapaProcViaturaAbertos();
+
+  if(activeFilter === 'baixadas'){
+    const baixadas = VIATURAS.filter(v => v.origem === 'baixada').filter(matchesQ);
+    if(baixadas.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura baixada.</div>'; return; }
+    container.innerHTML = htmlLocalCard('BAIXADAS', baixadas, 'baixadas', mapaProc); bindActionsViaturas(); return;
+  }
+  if(activeFilter === 'reservas'){
+    const reservas = VIATURAS.filter(v => v.origem === 'reserva').filter(matchesQ);
+    if(reservas.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura em reserva (DEMAN).</div>'; return; }
+    container.innerHTML = htmlLocalCard('DEMAN (Reservas)', reservas, 'reserva', mapaProc); bindActionsViaturas(); return;
+  }
+  if(activeFilter === 'diretorias'){
+    const ativasDir = VIATURAS.filter(v => v.origem === 'ativa' && ehDiretoria(v.gbm) && matchesQ(v));
+    if(ativasDir.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura em diretorias.</div>'; return; }
+    const listaDir = LOCAIS_DIRETORIAS.length ? LOCAIS_DIRETORIAS : LOCAIS_DIRETORIA;
+    const porLocal = {}; listaDir.forEach(l => porLocal[l] = []);
+    ativasDir.forEach(v => { const key = v.gbm || '(Sem local)'; if(!porLocal[key]) porLocal[key] = []; porLocal[key].push(v); });
+    const ordem = [...listaDir, ...Object.keys(porLocal).filter(k => !listaDir.includes(k))];
+    let html = ''; ordem.forEach(local => { const lista = porLocal[local] || []; if(q && lista.length === 0) return; html += htmlLocalCard(local, lista, '', mapaProc); });
+    container.innerHTML = html; bindActionsViaturas(); return;
+  }
+  if(activeFilter === 'ativas'){
+    const naoBaixadas = VIATURAS.filter(v => v.origem !== 'baixada').filter(matchesQ);
+    if(naoBaixadas.length === 0){ container.innerHTML = '<div class="empty">Nenhuma viatura ativa.</div>'; return; }
+    const ativas = naoBaixadas.filter(v => v.origem === 'ativa' && !ehDiretoria(v.gbm));
+    const reservas = naoBaixadas.filter(v => v.origem === 'reserva');
+    const porLocal = {}; LOCAIS.forEach(l => porLocal[l] = []);
+    ativas.forEach(v => { const key = v.gbm || '(Sem local)'; if(!porLocal[key]) porLocal[key] = []; porLocal[key].push(v); });
+    const ordem = [...LOCAIS, ...Object.keys(porLocal).filter(k => !LOCAIS.includes(k) && k !== '(Sem local)')];
+    if(porLocal['(Sem local)']) ordem.push('(Sem local)');
+    let html = ''; ordem.forEach(local => { const lista = porLocal[local] || []; if(q && lista.length === 0) return; html += htmlLocalCard(local, lista, '', mapaProc); });
+    if(reservas.length > 0) html += htmlLocalCard('DEMAN (Reservas)', reservas, 'reserva', mapaProc);
+    container.innerHTML = html; bindActionsViaturas(); return;
+  }
+  const ativas = VIATURAS.filter(v => v.origem === 'ativa' && !ehDiretoria(v.gbm));
+  const porLocal = {}; LOCAIS.forEach(l => porLocal[l] = []);
+  ativas.filter(matchesQ).forEach(v => { const key = v.gbm || '(Sem local)'; if(!porLocal[key]) porLocal[key] = []; porLocal[key].push(v); });
+  const ordem = [...LOCAIS, ...Object.keys(porLocal).filter(k => !LOCAIS.includes(k) && k !== '(Sem local)')];
+  if(porLocal['(Sem local)']) ordem.push('(Sem local)');
+  let html = ''; ordem.forEach(local => { const lista = porLocal[local] || []; if(q && lista.length === 0) return; html += htmlLocalCard(local, lista, '', mapaProc); });
+  if(html.trim() === ''){ container.innerHTML = '<div class="empty">Nenhuma viatura encontrada.</div>'; return; }
+  container.innerHTML = html; bindActionsViaturas();
+}
+function bindActionsViaturas(){
+  const podeGerenciar = temPermissao('viat_gerenciar');
+  if(podeGerenciar){
+    document.querySelectorAll('#view-viaturas [data-action="mudar"]').forEach(b => b.addEventListener('click', () => abrirModalMudarLocal(b.dataset.prefixo)));
+    document.querySelectorAll('#view-viaturas [data-action="permutar"]').forEach(b => b.addEventListener('click', () => abrirModalPermutar(b.dataset.prefixo, b.dataset.origem, b.dataset.gbm)));
+    document.querySelectorAll('#view-viaturas [data-action="baixar"]').forEach(b => b.addEventListener('click', () => abrirModalBaixar(b.dataset.prefixo, b.dataset.gbm, b.dataset.origem)));
+    document.querySelectorAll('#view-viaturas [data-action="reativar"]').forEach(b => b.addEventListener('click', () => abrirModalReativar(b.dataset.prefixo)));
+    document.querySelectorAll('#view-viaturas [data-action="moverReserva"]').forEach(b => b.addEventListener('click', () => abrirModalMoverReserva(b.dataset.prefixo)));
+  }
+  document.querySelectorAll('#view-viaturas [data-action="verProcessos"]').forEach(b => b.addEventListener('click', () => abrirModalMultiProcessos(b.dataset.prefixo)));
+}
+
+function renderViaturas(){ if(activeView !== 'viaturas') return; renderSummaryViaturas(); renderLocalGridViaturas(); }
+function abrirModal(titulo, camposHtml, onConfirm, permissaoNecessaria){
+  if(permissaoNecessaria && !temPermissao(permissaoNecessaria)){ alert('Acesso negado.'); return; }
+  $('modalTitle').textContent = titulo; $('modalFields').innerHTML = camposHtml;
+  const modal = $('actionModal'); modal.style.display = 'flex';
+  const confirm = $('modalConfirm'); const cancel = $('modalCancel');
+  function fechar(){ modal.style.display = 'none'; confirm.removeEventListener('click', handler); cancel.removeEventListener('click', fechar); confirm.disabled = false; confirm.textContent = 'Confirmar'; }
+  async function handler(){
+    if(confirm.disabled) return; confirm.disabled = true; confirm.textContent = 'Processando…';
+    try{ const ok = await onConfirm(); if(ok) fechar(); else { confirm.disabled = false; confirm.textContent = 'Confirmar'; } }
+    catch(e){ alert('Erro: '+e.message); confirm.disabled = false; confirm.textContent = 'Confirmar'; }
+  }
+  confirm.addEventListener('click', handler); cancel.addEventListener('click', fechar);
+}
+function htmlOpcoesLocais(selecionado){
+  function opt(l){
+    const sel = (selecionado && normalizeStr(l) === normalizeStr(selecionado)) ? ' selected' : '';
+    const label = (l === 'CSMP' || l === 'ALMOXARIFADO') ? 'Almoxarifado' : l;
+    return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(label)}</option>`;
+  }
+  let html = '';
+  const unidades   = LOCAIS.length         ? LOCAIS         : LOCAIS_UNIDADE;
+  const diretorias = LOCAIS_DIRETORIAS.length ? LOCAIS_DIRETORIAS : LOCAIS_DIRETORIA;
+  if(unidades.length > 0)   html += `<optgroup label="GBMs / SGBM / GBS">${unidades.map(opt).join('')}</optgroup>`;
+  if(diretorias.length > 0) html += `<optgroup label="Diretorias">${diretorias.map(opt).join('')}</optgroup>`;
+  return html;
+}
+function htmlOpcoesMotivo(){ return MOTIVOS_BAIXA.map(m => `<option value="${escapeAttr(m)}">${escapeHtml(m)}</option>`).join(''); }
+function htmlOpcoesSubstituta(prefixoExcluido){
+  const outras = VIATURAS.filter(v => v.prefixo !== prefixoExcluido && v.origem !== 'baixada');
+  if(outras.length === 0) return `<option value="">— Nenhuma outra viatura disponível —</option>`;
+  let html = `<option value="">— Nenhuma (deixar vaga) —</option>`;
+  const reservas = outras.filter(v => v.origem === 'reserva'); const ativas = outras.filter(v => v.origem === 'ativa');
+  if(reservas.length){ html += `<optgroup label="Reservas (serão promovidas)">`; reservas.forEach(v => html += `<option value="${escapeAttr(v.prefixo)}">${escapeHtml(v.prefixo)} · DEMAN</option>`); html += `</optgroup>`; }
+  if(ativas.length){ html += `<optgroup label="Ativas (serão realocadas)">`; ativas.forEach(v => html += `<option value="${escapeAttr(v.prefixo)}">${escapeHtml(v.prefixo)} · ${escapeHtml(v.gbm)}</option>`); html += `</optgroup>`; }
+  return html;
+}
+function abrirModalMudarLocal(prefixo){
+  const v = VIATURAS.find(x => x.prefixo === prefixo); if(!v) return;
+  abrirModal('Mudar local · '+prefixo, `<label>Local atual<input type="text" value="${escapeAttr(v.gbm)}" disabled style="opacity:.6;"></label><label>Novo local<select id="modalGbm" autofocus>${htmlOpcoesLocais(v.gbm)}</select></label>`, async () => {
+    const novoGbm = $('modalGbm').value; if(!novoGbm){ alert('Selecione o local.'); return false; }
+    if(normalizeStr(novoGbm) === normalizeStr(v.gbm)){ alert('O local é o mesmo.'); return false; }
+    const r = await apiViaturas('mudarGbm', { prefixo, novoGbm });
+    if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+    await loadDataViaturas(); return true;
+  }, 'viat_mudar');
+}
+function abrirModalPermutar(prefixo, origem, gbm){
+  const destinoAPI = origem === 'ativa' ? 'Reserva' : 'Ativa';
+  const destinoLabel = origem === 'ativa' ? 'DEMAN (Reserva)' : 'Ativa';
+  const titulo = origem === 'ativa' ? `Mover ${prefixo} para Reserva` : `Ativar ${prefixo}`;
+  let corpo = `<p style="font-size:13px;color:var(--text-dim);margin:0;"><b>${escapeHtml(prefixo)}</b> ${gbm?`· ${escapeHtml(gbm)}`:''} será movida para <b>${destinoLabel}</b>.</p>`;
+  if(origem === 'reserva') corpo += `<label>Local de destino<select id="modalNovoGbm" autofocus>${htmlOpcoesLocais('')}</select></label>`;
+  if(origem === 'ativa' && gbm) corpo += `<label>Viatura substituta em ${escapeHtml(gbm)} (opcional)<select id="modalSubstituto">${htmlOpcoesSubstituta(prefixo)}</select></label>`;
+  abrirModal(titulo, corpo, async () => {
+    const sub = $('modalSubstituto'); const substituto = sub ? sub.value : '';
+    const gbmSel = $('modalNovoGbm'); const novoGbm = gbmSel ? gbmSel.value : '';
+    if(origem === 'reserva' && !novoGbm){ alert('Selecione o local de destino.'); return false; }
+    const r = await apiViaturas('permutarViatura', { prefixo, destino: destinoAPI, substituto, novoGbm });
+    if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+    await loadDataViaturas(); return true;
+  }, 'viat_permutar');
+}
+function abrirModalBaixar(prefixo, gbm, origem){
+  let corpo = `<p style="font-size:13px;color:var(--text-dim);margin:0;">Confirma o baixamento de <b>${escapeHtml(prefixo)}</b>${gbm?` (${escapeHtml(gbm)})`:''}?</p><label>Motivo<select id="modalMotivo" autofocus>${htmlOpcoesMotivo()}</select></label>`;
+  if(origem === 'ativa' && gbm) corpo += `<label>Viatura substituta em ${escapeHtml(gbm)} (opcional)<select id="modalSubstituto">${htmlOpcoesSubstituta(prefixo)}</select></label>`;
+  abrirModal('Baixar viatura · '+prefixo, corpo, async () => {
+    const motivo = $('modalMotivo').value; if(!motivo){ alert('Selecione o motivo.'); return false; }
+    const sub = $('modalSubstituto'); const substituto = sub ? sub.value : '';
+    const r = await apiViaturas('baixarViatura', { prefixo, motivo, substituto });
+    if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+    await loadDataViaturas(); return true;
+  }, 'viat_baixar');
+}
+function abrirModalReativar(prefixo){
+  const v = VIATURAS.find(x => x.prefixo === prefixo); if(!v) return;
+  abrirModal('Reativar viatura · '+prefixo, `<p style="font-size:13px;color:var(--text-dim);margin:0;"><b>${escapeHtml(prefixo)}</b> voltará ao serviço ativo.</p>${v.gbm ? `<label>Local original<input type="text" value="${escapeAttr(v.gbm)}" disabled style="opacity:.6;"></label>` : ''}<label>Novo local<select id="modalGbm" autofocus>${htmlOpcoesLocais(v.gbm)}</select></label>`, async () => {
+    const gbm = $('modalGbm').value; if(!gbm){ alert('Selecione o local.'); return false; }
+    const r = await apiViaturas('reativarViatura', { prefixo, gbm });
+    if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+    await loadDataViaturas(); return true;
+  }, 'viat_reativar');
+}
+function abrirModalMoverReserva(prefixo){
+  abrirModal('Mover para Reserva · '+prefixo, `<p style="font-size:13px;color:var(--text-dim);margin:0;"><b>${escapeHtml(prefixo)}</b> será movida de <b>baixadas</b> para <b>DEMAN (Reserva)</b>.</p>`, async () => {
+    const r = await apiViaturas('moverBaixadaParaReserva', { prefixo });
+    if(!r.ok){ alert('Erro: '+r.error); return false; }
+    try{ sessionStorage.removeItem(CACHE_KEY); }catch(e){}
+    await loadDataViaturas(); return true;
+  }, 'viat_permutar');
+}
+
+function abrirModalMultiProcessos(prefixo){
+  const grupos = agruparPorProcesso();
+  const procs = Object.values(grupos)
+    .filter(g => g.tipo === TIPO_VIATURA && g.aberto && normalizarPrefixoManut(g.viatura) === normalizarPrefixoManut(prefixo))
+    .sort((a, b) => {
+      const da = parseDataManut(a.entrada ? a.entrada.data : '');
+      const db = parseDataManut(b.entrada ? b.entrada.data : '');
+      return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+    });
+  const sub = $('multiProcessosSub');
+  sub.textContent = 'Viatura ' + prefixo + ' · ' + procs.length + ' processo(s) aberto(s)';
+  const lista = $('multiProcessosLista');
+  if(procs.length === 0){
+    lista.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-faint);">Nenhum processo aberto.</div>';
+  } else {
+    lista.innerHTML = procs.map(p => {
+      const dias = p.entrada ? Math.floor((getNowTime() - (parseDataManut(p.entrada.data)?.getTime() || getNowTime())) / 86400000) : 0;
+      const cor = dias > 30 ? 'var(--vermelho)' : (dias > 15 ? 'var(--amber)' : 'var(--text-dim)');
+      return `<div style="background:var(--surface-2);border:1px solid var(--border);border-left:4px solid ${cor};border-radius:8px;padding:10px 12px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--amber);font-weight:600;">${escapeHtml(p.id)}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${cor};">${dias}d</span>
+        </div>
+        <div style="font-size:12px;color:var(--text);">📍 ${escapeHtml(p.ultimo.local || p.entrada.local || '—')} · 🟡 ${escapeHtml(statusLabelManut(p.ultimo.status))}</div>
+        <div style="font-size:10.5px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;margin-top:3px;">Entrada: ${escapeHtml(p.entrada.data)} · ${p.eventos.length} evento(s)</div>
+        ${p.solicitante ? `<div style="font-size:10.5px;color:var(--azul);margin-top:2px;">👤 ${escapeHtml(p.solicitante)}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+  $('multiProcessosModal').style.display = 'flex';
+}
+
+function _classeStatusLocal(status, modoEvento){
+  const s = normalizeStr(status || '');
+  if(!s && modoEvento) return 'livre';
+  if(s.includes('manut') || s.includes('oficina') || s.includes('quebrad')) return 'manutencao';
+  if(s.includes('reserv')) return 'reserva';
+  if(s.includes('baixa') || s.includes('inoper')) return 'baixada';
+  return 'ativa';
+}
+function _htmlInputLocal(idCampo, valorAtual){
+  return `<input type="text" id="${idCampo}" value="${escapeAttr(valorAtual||'')}" placeholder="Ex.: Fix Car, Vidrocar, Arcom…" autocomplete="off" autocapitalize="characters">
+    <span class="local-hint">Texto livre.</span>`;
+}
+function _htmlInputLocalComLista(idCampo, valorAtual, listaSugestoes){
+  const idLista = 'dl-' + idCampo;
+  const lista = (listaSugestoes || []).filter(Boolean);
+  const datalist = lista.length
+    ? `<datalist id="${idLista}">${lista.map(l => `<option value="${escapeAttr(l)}"></option>`).join('')}</datalist>`
+    : '';
+  return `<input type="text" id="${idCampo}" value="${escapeAttr(valorAtual||'')}" list="${idLista}" placeholder="Digite ou escolha da lista…" autocomplete="off" autocapitalize="characters">
+    ${datalist}
+    <span class="local-hint">Você pode digitar livremente ou escolher uma oficina/unidade.</span>`;
+}
+function _htmlSelectLocal(idCampo, valorAtual){
+  const vAtual = String(valorAtual||'').trim().toUpperCase();
+  function opt(l){
+    const sel = (vAtual && vAtual === l.toUpperCase()) ? ' selected' : '';
+    const label = (l === 'CSMP' || l === 'ALMOXARIFADO') ? 'Almoxarifado' : l;
+    return `<option value="${escapeAttr(l)}"${sel}>${escapeHtml(label)}</option>`;
+  }
+  const selVazio = vAtual ? '' : ' selected';
+  const unidades   = LOCAIS.length         ? LOCAIS         : LOCAIS_UNIDADE;
+  const diretorias = LOCAIS_DIRETORIAS.length ? LOCAIS_DIRETORIAS : LOCAIS_DIRETORIA;
+  return `<select id="${idCampo}" autocomplete="off">
+    <option value=""${selVazio}>— Selecione o local —</option>
+    <optgroup label="Reserva">${opt(LOCAL_RESERVA)}</optgroup>
+    <optgroup label="Unidades">${unidades.map(opt).join('')}</optgroup>
+    <optgroup label="Diretorias">${diretorias.map(opt).join('')}</optgroup>
+  </select>
+  <span class="local-hint">Deixe em branco para retornar ao local de origem.</span>`;
+}
+function _htmlLocalDisabled(idCampo, valor){
+  return `<input type="text" id="${idCampo}" value="${escapeAttr(valor)}" disabled><span class="local-hint">Definido automaticamente pelo status.</span>`;
+}
+function montarCampoLocal(wrapId, valorAtual, status, modoEvento, tipo){
+  const wrap = $(wrapId); if(!wrap) return;
+  const idCampo = wrapId.replace('-wrap','');
+  if(tipo === TIPO_OUTRO || tipo === TIPO_AGENDAMENTO){
+    wrap.innerHTML = _htmlInputLocal(idCampo, valorAtual);
+    return;
+  }
+  const classe = _classeStatusLocal(status, !!modoEvento);
+  if(classe === 'manutencao'){
+    const sugestoes = LOCAIS_OFICINA.concat(LOCAIS_UNIDADE, LOCAIS_DIRETORIA);
+    wrap.innerHTML = _htmlInputLocalComLista(idCampo, valorAtual, sugestoes);
+  }
+  else if(classe === 'livre'){ wrap.innerHTML = _htmlInputLocal(idCampo, valorAtual); }
+  else if(classe === 'reserva'){ wrap.innerHTML = _htmlLocalDisabled(idCampo, LOCAL_RESERVA); }
+  else if(classe === 'baixada'){ wrap.innerHTML = _htmlInputLocal(idCampo, valorAtual); }
+  else { wrap.innerHTML = _htmlSelectLocal(idCampo, valorAtual); }
+}
+function montarCampoLocalFinal(){
+  const wrap = $('mf-local-wrap'); if(!wrap) return;
+  const inputAtual = wrap.querySelector('input, select');
+  const valorAtual = inputAtual && !inputAtual.disabled ? inputAtual.value : (wrap.dataset.valor || '');
+  wrap.dataset.valor = valorAtual;
+  wrap.innerHTML = _htmlSelectLocal('mf-local', valorAtual);
+}
+function trocarCampoLocal(wrapId, statusSelectId, modoEvento, tipo){
+  const sel = $(statusSelectId); const wrap = $(wrapId);
+  if(!sel || !wrap) return;
+  const inputAtual = wrap.querySelector('input, select');
+  const valorAtual = inputAtual && !inputAtual.disabled ? inputAtual.value : (wrap.dataset.valor || '');
+  wrap.dataset.valor = valorAtual;
+  montarCampoLocal(wrapId, valorAtual, sel.value, modoEvento, tipo);
+}
+function lerLocalForm(wrapId){
+  const wrap = $(wrapId); if(!wrap) return '';
+  const input = wrap.querySelector('input, select');
+  if(!input) return '';
+  return String(input.value || '').trim().toUpperCase();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MANUTENÇÃO — parte 1: estado e helpers
+// ═══════════════════════════════════════════════════════════════════════════
+let MANUT_EVENTOS = [];
+let MANUT_FILTRO_STATUS = 'abertos';
+let MANUT_FILTRO_TIPO = '';
+let activeManutTab = 'registros';
+let modoManutForm = 'criar';
+let processoAtual = null;
+let sidebarMovExpanded = true;
+const DESFAZER_JANELA_MS = 30000;
+const _DESFAZER_STORAGE_KEY = 'deman_ultimo_evento_v1';
+const _ultimoEventoAdicionado = (function(){
+  try{ return JSON.parse(sessionStorage.getItem(_DESFAZER_STORAGE_KEY) || '{}'); }catch(e){ return {}; }
+})();
+function _persistirDesfazer(){
+  try{ sessionStorage.setItem(_DESFAZER_STORAGE_KEY, JSON.stringify(_ultimoEventoAdicionado)); }catch(e){}
+}
+let _desfazerTimer = null;
+let manutRepStatusFiltro = '';
+
+function setSidebarMovExpanded(v){ sidebarMovExpanded = !!v; const sub = $('sidebarSubMov'); const parent = $('sidebarMovParent'); if(sub) sub.classList.toggle('open', sidebarMovExpanded); if(parent) parent.classList.toggle('expanded', sidebarMovExpanded); }
+
+function parseDataManut(str){
+  if(!str) return null;
+  const s = String(str).trim();
+  if(s === '--' || s === '') return null;
+
+  let m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1], +(m[4]||0), +(m[5]||0));
+
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[\sT]+(\d{2}):(\d{2}))?/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3], +(m[4]||0), +(m[5]||0));
+
+  return null;
+}
+function normalizarPrefixoManut(v){ const t = String(v||'').trim().toUpperCase(); const m = t.match(/^([A-Z]+)[\s-]*(\d+)$/); if(m){ const num = m[2].length === 1 ? '0'+m[2] : m[2]; return m[1]+'-'+num; } return t.replace(/\s+/g,' '); }
+function toDatetimeLocalManut(str){
+  const d = parseDataManut(str); if(!d) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function extrairDiasNumericos(diasStr){ if(!diasStr) return 0; const m = String(diasStr).match(/(\d+)/); return m ? parseInt(m[1], 10) : 0; }
+function statusClasseManut(status){
+  const s = normalizeStr(status);
+  if(s.indexOf('reserv') !== -1) return 'reserva';
+  if(s.indexOf('baixa') !== -1 || s.indexOf('inoper') !== -1) return 'baixada';
+  if(s.indexOf('manut') !== -1 || s.indexOf('quebrada') !== -1 || s.indexOf('oficina') !== -1) return 'em-manutencao';
+  if(s.indexOf('convert') !== -1) return 'convertido';
+  if(s.indexOf('agend') !== -1) return 'agendado';
+  return 'ativa';
+}
+function statusLabelManut(status){
+  const c = statusClasseManut(status);
+  if(c === 'reserva') return 'Reserva';
+  if(c === 'baixada') return 'Baixada';
+  if(c === 'em-manutencao') return 'Em Manutenção';
+  if(c === 'convertido') return 'Convertido';
+  if(c === 'agendado') return 'Agendado';
+  return 'Ativa';
+}
+function corStatus(classe){
+  if(classe === 'reserva') return 'var(--roxo)';
+  if(classe === 'baixada') return 'var(--vermelho)';
+  if(classe === 'em-manutencao') return 'var(--amber)';
+  if(classe === 'convertido') return 'var(--verde)';
+  if(classe === 'agendado') return 'var(--roxo)';
+  return 'var(--verde)';
+}
+function iconeEvento(tipo){
+  const t = normalizeStr(tipo);
+  if(t.indexOf('entrada') !== -1) return '📥';
+  if(t.indexOf('agend') !== -1) return '📅';
+  if(t.indexOf('moviment') !== -1) return '🔄';
+  if(t.indexOf('observ') !== -1) return '📝';
+  if(t.indexOf('finaliz') !== -1) return '✅';
+  return '📌';
+}
+function classeEvento(tipo){
+  const t = normalizeStr(tipo);
+  if(t.indexOf('entrada') !== -1) return 'entrada';
+  if(t.indexOf('agend') !== -1) return 'agendamento';
+  if(t.indexOf('moviment') !== -1) return 'movimentacao';
+  if(t.indexOf('observ') !== -1) return 'observacao';
+  if(t.indexOf('finaliz') !== -1) return 'finalizacao';
+  return 'observacao';
+}
+
+async function loadDataManut(){
+  const upd = $('manutUpdateStatus');
+  const CACHE_KEY_MANUT = 'deman_cache_manut_v6';
+  const CACHE_TTL = 15 * 60 * 1000;
+  try{
+    const raw = sessionStorage.getItem(CACHE_KEY_MANUT);
+    if(raw){
+      const p = JSON.parse(raw);
+      if(p && Array.isArray(p.eventos) && (Date.now() - p.ts) < CACHE_TTL){
+        MANUT_EVENTOS = p.eventos;
+        upd.textContent = 'Cache · ' + new Date(p.ts).toLocaleTimeString('pt-BR');
+        if(activeView === 'manutencao') renderManut();
+        if(activeView === 'home') renderHome();
+      }
+    }
+  }catch(e){}
+  upd.textContent = 'Atualizando…';
+  try{
+    const r = await apiManut('listarManutencao');
+    if(!r.ok){ upd.textContent = 'Falha: ' + (r.error || 'desconhecido'); return; }
+    MANUT_EVENTOS = Array.isArray(r.eventos) ? r.eventos : [];
+    try{ sessionStorage.setItem(CACHE_KEY_MANUT, JSON.stringify({ ts: Date.now(), eventos: MANUT_EVENTOS })); }catch(e){}
+    upd.textContent = 'Atualizado em ' + new Date().toLocaleTimeString('pt-BR');
+    if(activeView === 'manutencao') renderManut();
+    if(activeView === 'home') renderHome();
+    if(activeView === 'viaturas') renderViaturas();
+  }catch(err){
+    console.error(err);
+    upd.textContent = 'Erro: ' + err.message;
+  }
+}
+
+function agruparPorProcesso(){
+  const grupos = {};
+  MANUT_EVENTOS.forEach(e => {
+    if(!grupos[e.id]) grupos[e.id] = { id: e.id, viatura: e.viatura, tipo: e.tipo || TIPO_VIATURA, eventos: [] };
+    grupos[e.id].eventos.push(e);
+    if(e.tipo && e.tipo !== grupos[e.id].tipo) grupos[e.id].tipo = e.tipo;
+  });
+  Object.keys(grupos).forEach(id => {
+    const g = grupos[id];
+    g.eventos.sort((a, b) => {
+      const da = parseDataManut(a.data);
+      const db = parseDataManut(b.data);
+      return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+    });
+    g.aberto = !g.eventos.some(e => normalizeStr(e.evento).indexOf('finaliz') !== -1);
+    g.entrada = g.eventos.find(e => {
+      const ev = normalizeStr(e.evento);
+      return ev.indexOf('entrada') !== -1 || ev.indexOf('agend') !== -1;
+    }) || g.eventos[0];
+    g.finalizacao = g.eventos.find(e => normalizeStr(e.evento).indexOf('finaliz') !== -1) || null;
+    g.ultimo = g.eventos[g.eventos.length - 1];
+    g.dias = g.finalizacao ? extrairDiasNumericos(g.finalizacao.dias) : 0;
+    if(g.entrada && g.entrada.tipo) g.tipo = g.entrada.tipo;
+    g.solicitante = (g.entrada && g.entrada.solicitante) ? g.entrada.solicitante : '';
+    if(g.tipo === TIPO_AGENDAMENTO){
+      g.agendamentoConvertido = g.eventos.some(e =>
+        e.evento === EVENTO_FINALIZACAO && normalizeStr(e.status).indexOf('convert') !== -1
+      );
+      if(!g.agendamentoConvertido && g.entrada){
+        const dtAg = parseDataManut(g.entrada.data);
+        g.agendamentoVencido = dtAg && dtAg.getTime() <= getNowTime();
+        g.dataAgendada = dtAg;
+      }
+    }
+  });
+  return grupos;
+}
+
+function calcularEstatisticasManut(){
+  const grupos = agruparPorProcesso();
+  const ids = Object.keys(grupos);
+  const total = ids.length;
+  let abertos = 0, fechados = 0, baixadas = 0, agendAbertos = 0;
+  ids.forEach(id => {
+    const g = grupos[id];
+    if(g.aberto) abertos++; else fechados++;
+    const classe = statusClasseManut(g.ultimo ? g.ultimo.status : '');
+    if(classe === 'baixada') baixadas++;
+    if(g.tipo === TIPO_AGENDAMENTO && g.aberto) agendAbertos++;
+  });
+  return { total, abertos, fechados, baixadas, agendAbertos };
+}
+
+function renderSummaryManut(){
+  const st = calcularEstatisticasManut();
+  const cards = [
+    { key:'todas',       label:'Total de processos', value: st.total,       cls:'manut-total' },
+    { key:'abertos',     label:'Em andamento',       value: st.abertos,     cls:'manut-abertos' },
+    { key:'finalizados', label:'Finalizados',        value: st.fechados,    cls:'manut-fechados' },
+    { key:'agendamentos',label:'📅 Agendamentos',    value: st.agendAbertos,cls:'manut-agend' }
+  ];
+  $('manutSummary').innerHTML = cards.map(c => `<div class="summary-card ${c.cls}" data-filter="${c.key}"><div class="label">${c.label}</div><div class="value">${c.value}</div></div>`).join('');
+  document.querySelectorAll('#view-manutencao .summary-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const k = card.dataset.filter;
+      MANUT_FILTRO_STATUS = (MANUT_FILTRO_STATUS === k) ? 'todas' : k;
+      renderManut();
+    });
+  });
+}
+
+function processosFiltrados(){
+  const q = normalizeStr($('manutSearch').value);
+  const grupos = agruparPorProcesso();
+  let ids = Object.keys(grupos);
+  if(MANUT_FILTRO_TIPO){ ids = ids.filter(id => (grupos[id].tipo || TIPO_VIATURA) === MANUT_FILTRO_TIPO); }
+  ids.sort((a, b) => {
+    const ga = grupos[a], gb = grupos[b];
+    if(ga.aberto !== gb.aberto) return ga.aberto ? -1 : 1;
+    const da = ga.ultimo ? ga.ultimo.data : '';
+    const db = gb.ultimo ? gb.ultimo.data : '';
+    const pa = parseDataManut(da), pb = parseDataManut(db);
+    return (pb ? pb.getTime() : 0) - (pa ? pa.getTime() : 0);
+  });
+  if(MANUT_FILTRO_STATUS === 'abertos') ids = ids.filter(id => grupos[id].aberto);
+  else if(MANUT_FILTRO_STATUS === 'finalizados') ids = ids.filter(id => !grupos[id].aberto);
+  else if(MANUT_FILTRO_STATUS === 'baixadas') ids = ids.filter(id => statusClasseManut(grupos[id].ultimo ? grupos[id].ultimo.status : '') === 'baixada');
+  else if(MANUT_FILTRO_STATUS === 'agendamentos') ids = ids.filter(id => grupos[id].tipo === TIPO_AGENDAMENTO && grupos[id].aberto);
+  if(q){
+    ids = ids.filter(id => {
+      const g = grupos[id];
+      if(normalizeStr(g.viatura).includes(q)) return true;
+      if(normalizeStr(g.id).includes(q)) return true;
+      if(normalizeStr(g.solicitante).includes(q)) return true;
+      return g.eventos.some(e =>
+        normalizeStr(e.local).includes(q) ||
+        normalizeStr(e.informante).includes(q) ||
+        normalizeStr(e.detalhes).includes(q)
+      );
+    });
+  }
+  return ids.map(id => grupos[id]);
+}
+
+function renderManutGrid(){
+  const container = $('manutContent');
+  const procs = processosFiltrados();
+  const podeEditar = temPermissao('manut_editar');
+  const podeExcluirAberto   = temPermissao('manut_excluir');
+  const podeExcluirFechado  = temPermissao('manut_excluir_fechado');
+
+  if(procs.length === 0){
+    container.innerHTML = '<div class="manut-empty">Nenhum processo encontrado.</div>';
+    return;
+  }
+
+  const waSvgCard = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>';
+
+  container.innerHTML = procs.map(p => {
+    const tipoProc = p.tipo || TIPO_VIATURA;
+    const tipoClasse = tipoProc === TIPO_OUTRO ? 'outro' : (tipoProc === TIPO_AGENDAMENTO ? 'agendamento' : 'viatura');
+    const badgeTipo = `<span class="manut-proc-tipo ${tipoClasse}">${escapeHtml(tipoProc)}</span>`;
+
+    let classeCard, statusLabel, statusClasse;
+    if(tipoProc === TIPO_AGENDAMENTO){
+      if(p.agendamentoConvertido){ classeCard = 'agendado-convertido'; statusLabel = 'Convertido'; statusClasse = 'convertido'; }
+      else if(p.agendamentoVencido){ classeCard = 'agendado-vencido'; statusLabel = 'Vencido (aguardando)'; statusClasse = 'agendado'; }
+      else { classeCard = 'agendado'; statusLabel = 'Agendado'; statusClasse = 'agendado'; }
+    } else {
+      classeCard = !p.aberto ? (statusClasseManut(p.ultimo.status) === 'baixada' ? 'baixada' : 'fechado') : 'aberto';
+      statusClasse = statusClasseManut(p.ultimo ? p.ultimo.status : '');
+      statusLabel = statusLabelManut(p.ultimo ? p.ultimo.status : '');
+    }
+    const localAtual = p.ultimo ? escapeHtml(p.ultimo.local || '—') : '—';
+
+    const eventosHtml = p.eventos.map(e => {
+      const cls = classeEvento(e.evento);
+      const ico = iconeEvento(e.evento);
+      const isSistema = normalizeStr(e.informante).indexOf('sistema') !== -1;
+      const statusEv = e.status ? `<div class="manut-ev-status">Status: ${escapeHtml(statusLabelManut(e.status))}</div>` : '';
+      const diasEv = e.dias ? ` · ${escapeHtml(e.dias)}` : '';
+      const infIco = isSistema ? '🤖' : '👤';
+      return `<div class="manut-ev">
+        <div class="manut-ev-head">
+          <span class="manut-ev-tipo ${cls}">${ico} ${escapeHtml(e.evento)}</span>
+          <span class="manut-ev-data">${escapeHtml(e.data || '—')}${diasEv}</span>
+        </div>
+        ${e.local ? `<div class="manut-ev-local">📍 ${escapeHtml(e.local)}</div>` : ''}
+        ${statusEv}
+        ${e.detalhes ? `<div class="manut-ev-detalhe">${escapeHtml(e.detalhes)}</div>` : ''}
+        ${e.informante ? `<div class="manut-ev-informante">${infIco} ${escapeHtml(e.informante)}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    let acoes = '';
+    if(tipoProc === TIPO_AGENDAMENTO){
+      if(p.aberto && !p.agendamentoConvertido){
+        if(podeEditar) acoes += `<button class="btn ghost" data-action="evento" data-id="${escapeAttr(p.id)}">+ Observação</button>`;
+        if(p.agendamentoVencido && podeEditar){
+          acoes += `<button class="btn success" data-action="converterAgendamento" data-id="${escapeAttr(p.id)}">⚡ Converter agora</button>`;
+        }
+      }
+      acoes += `<button class="btn whatsapp" data-action="whats" data-id="${escapeAttr(p.id)}" title="Compartilhar">${waSvgCard}</button>`;
+
+      const podeApagar = podeExcluirAberto;
+      if(podeApagar) acoes += `<button class="btn danger" data-action="excluir" data-id="${escapeAttr(p.id)}" title="Excluir agendamento">🗑</button>`;
+    } else {
+      if(p.aberto){
+        if(podeEditar) acoes += `<button class="btn success" data-action="finalizar" data-id="${escapeAttr(p.id)}">✅ Finalizar</button>`;
+        if(podeEditar) acoes += `<button class="btn ghost" data-action="evento" data-id="${escapeAttr(p.id)}">+ Evento</button>`;
+      }
+      acoes += `<button class="btn whatsapp" data-action="whats" data-id="${escapeAttr(p.id)}" title="Compartilhar">${waSvgCard}</button>`;
+      const tsUltimo = _ultimoEventoAdicionado[p.id] || 0;
+      const dentroJanela = (Date.now() - tsUltimo) < DESFAZER_JANELA_MS;
+      if(p.aberto && p.eventos.length > 1 && podeEditar && dentroJanela){
+        acoes += `<button class="btn ghost" data-action="desfazer" data-id="${escapeAttr(p.id)}" title="Desfazer último evento">↩</button>`;
+      }
+      const podeApagarEste = p.aberto ? podeExcluirAberto : podeExcluirFechado;
+      if(podeApagarEste){
+        acoes += `<button class="btn danger" data-action="excluir" data-id="${escapeAttr(p.id)}" title="Excluir processo">🗑</button>`;
+      }
+    }
+
+    let badge;
+    if(tipoProc === TIPO_AGENDAMENTO){
+      if(p.agendamentoConvertido) badge = '<span class="manut-proc-badge agendado-convertido">✅ Convertido</span>';
+      else if(p.agendamentoVencido) badge = '<span class="manut-proc-badge agendado-vencido">⚠ Vencido</span>';
+      else badge = '<span class="manut-proc-badge agendado">📅 Agendado</span>';
+    } else {
+      badge = p.aberto ? '<span class="manut-proc-badge aberto">🟡 Aberto</span>' : '<span class="manut-proc-badge fechado">✅ Fechado</span>';
+    }
+
+    let dataBadge = '';
+    if(tipoProc === TIPO_AGENDAMENTO && p.entrada){
+      const dt = parseDataManut(p.entrada.data);
+      dataBadge = dt ? `📅 ${dt.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}` : `📅 ${escapeHtml(p.entrada.data)}`;
+    } else if(p.aberto){
+      dataBadge = `Desde ${escapeHtml(p.entrada ? p.entrada.data : '—')}`;
+    } else {
+      dataBadge = `Fechado em ${escapeHtml(p.finalizacao ? p.finalizacao.data : '—')}`;
+    }
+
+    const diasTxt = p.finalizacao && p.dias > 0 ? `${p.dias}d` : '';
+    const solicitanteHtml = p.solicitante ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--azul);">👤 Solicitado por ${escapeHtml(p.solicitante)}</span>` : '';
+
+    let slaBadge = '';
+    if(tipoProc !== TIPO_AGENDAMENTO && p.aberto && p.entrada){
+      const dtEntrada = parseDataManut(p.entrada.data);
+      if(dtEntrada){
+        const dias = Math.floor((getNowTime() - dtEntrada.getTime()) / 86400000);
+        if(dias > 30) slaBadge = `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--vermelho);background:rgba(239,83,80,.12);border:1px solid rgba(239,83,80,.5);border-radius:20px;padding:2px 8px;font-weight:600;">🚨 ${dias}d aberto</span>`;
+        else if(dias > 15) slaBadge = `<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--amber);background:rgba(232,169,58,.12);border:1px solid rgba(232,169,58,.5);border-radius:20px;padding:2px 8px;font-weight:600;">⚠ ${dias}d aberto</span>`;
+      }
+    }
+
+    return `<div class="manut-proc-card ${classeCard}">
+      <div class="manut-proc-head">
+        <div class="manut-proc-head-left">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span class="manut-proc-viatura">${escapeHtml(p.viatura)}</span>
+            ${badgeTipo}
+          </div>
+          <div class="manut-proc-id">${escapeHtml(p.id)}</div>
+        </div>
+        <div class="manut-proc-head-right">
+          ${badge}
+          <div class="manut-proc-dias">${diasTxt}</div>
+        </div>
+      </div>
+      <div class="manut-proc-meta">
+        <span class="manut-pill ${statusClasse}"><span class="dot" style="background:${corStatus(statusClasse)}"></span>${escapeHtml(statusLabel)}</span>
+        <span>${localAtual}</span>
+        <span style="color:var(--text-faint);">· ${p.eventos.length} evento${p.eventos.length>1?'s':''}</span>
+        <span style="color:var(--text-faint);">· ${dataBadge}</span>
+        ${solicitanteHtml}
+        ${slaBadge}
+      </div>
+      <div class="manut-timeline">${eventosHtml}</div>
+      <div class="manut-proc-actions">${acoes}</div>
+    </div>`;
+  }).join('');
+
+  if(_desfazerTimer) clearTimeout(_desfazerTimer);
+  const agora = Date.now();
+  let menorRestante = Infinity;
+  procs.forEach(p => {
+    const ts = _ultimoEventoAdicionado[p.id] || 0;
+    const restante = DESFAZER_JANELA_MS - (agora - ts);
+    if(restante > 0 && restante < menorRestante) menorRestante = restante;
+  });
+  if(menorRestante !== Infinity){
+    _desfazerTimer = setTimeout(() => { if(activeView === 'manutencao') renderManut(); }, menorRestante + 100);
+  }
+
+  container.querySelectorAll('[data-action="finalizar"]').forEach(btn => {
+    btn.addEventListener('click', () => { const p = procs.find(x => x.id === btn.dataset.id); if(p) abrirFormFinalizar(p); });
+  });
+  container.querySelectorAll('[data-action="evento"]').forEach(btn => {
+    btn.addEventListener('click', () => { const p = procs.find(x => x.id === btn.dataset.id); if(p) abrirFormEvento(p); });
+  });
+  container.querySelectorAll('[data-action="whats"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = procs.find(x => x.id === btn.dataset.id); if(!p) return;
+      const msg = p.aberto ? montarMensagemEntrada(p) : montarMensagemFinalizacao(p);
+      abrirWhatsApp(msg);
+    });
+  });
+  container.querySelectorAll('[data-action="desfazer"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const p = procs.find(x => x.id === btn.dataset.id); if(!p) return;
+      if(!confirm('Desfazer o último evento de ' + p.id + '?')) return;
+      btn.disabled = true;
+      const r = await apiManut('removerUltimoEvento', { id: p.id });
+      btn.disabled = false;
+      if(!r.ok){ alert('Erro: ' + r.error); return; }
+      delete _ultimoEventoAdicionado[p.id];
+      _persistirDesfazer();
+      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+      await loadDataManut();
+    });
+  });
+  container.querySelectorAll('[data-action="excluir"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const p = procs.find(x => x.id === btn.dataset.id); if(!p) return;
+      const podeAgora = p.aberto ? temPermissao('manut_excluir') : temPermissao('manut_excluir_fechado');
+      if(!podeAgora){ alert('Sem permissão para excluir este processo.'); return; }
+      const aviso = p.aberto
+        ? 'Excluir o processo ' + p.id + ' (' + p.eventos.length + ' eventos)?'
+        : 'Excluir o processo FINALIZADO ' + p.id + ' (' + p.eventos.length + ' eventos)?\nEsta ação apaga o histórico.';
+      if(!confirm(aviso)) return;
+      btn.disabled = true;
+      const r = await apiManut('removerProcesso', { id: p.id });
+      btn.disabled = false;
+      if(!r.ok){ alert('Erro: ' + r.error); return; }
+      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+      await loadDataManut();
+    });
+  });
+  container.querySelectorAll('[data-action="converterAgendamento"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = procs.find(x => x.id === btn.dataset.id); if(p) tentarConverterAgendamento(p);
+    });
+  });
+}
+
+function renderManut(){
+  if(activeView !== 'manutencao') return;
+  renderSummaryManut();
+  renderManutGrid();
+  const clearBtn = $('manutClearFilterBtn');
+  if(clearBtn){
+    const hasSearch = ($('manutSearch') && $('manutSearch').value.trim());
+    clearBtn.style.display = (MANUT_FILTRO_STATUS !== 'abertos' || MANUT_FILTRO_TIPO || hasSearch) ? 'inline-block' : 'none';
+  }
+}
+
+let _conversaoPendenteId = null;
+function tentarConverterAgendamento(p){
+  if(!p || p.tipo !== TIPO_AGENDAMENTO || p.agendamentoConvertido) return;
+  _conversaoPendenteId = p.id;
+  (async () => {
+    const r = await apiManut('forcarConversaoAgendamento', { idAgendamento: p.id, paralelo: false });
+    if(r.ok){
+      try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+      await loadDataManut();
+      mostrarSucesso({
+        titulo: 'Agendamento convertido!',
+        sub: 'Novo processo: ' + r.idNovo,
+        resumo: [['ID agendamento', p.id], ['Novo processo Viatura', r.idNovo], ['Viatura', p.viatura]],
+        mensagemWhats: ''
+      });
+      _conversaoPendenteId = null;
+      return;
+    }
+    if(r.requerConfirmacaoParalelo){
+      abrirModalForcarConversao(p, r.processosAbertos || []);
+      return;
+    }
+    alert('Erro: ' + (r.error || 'desconhecido'));
+    _conversaoPendenteId = null;
+  })();
+}
+
+function abrirModalForcarConversao(p, processosAbertos){
+  const sub = $('forcarConversaoSub');
+  sub.innerHTML = 'A viatura <b>' + escapeHtml(p.viatura) + '</b> já tem ' + processosAbertos.length + ' processo(s) aberto(s).<br>Converter o agendamento vai gerar um <b>processo paralelo</b>.';
+  const lista = $('forcarConversaoLista');
+  lista.innerHTML = processosAbertos.map(a => `<div style="background:var(--surface-2);border:1px solid var(--border);border-left:4px solid var(--amber);border-radius:8px;padding:8px 12px;font-size:12px;">
+    <span style="font-family:'IBM Plex Mono',monospace;color:var(--amber);font-weight:600;">${escapeHtml(a.id)}</span>
+    · 📍 ${escapeHtml(a.ultimoLocal || a.entradaLocal || '—')}
+    · ${a.dias || 0}d
+  </div>`).join('');
+  $('forcarConversaoErro').style.display = 'none';
+  $('forcarConversaoModal').style.display = 'flex';
+}
+
+function getMesesDisponiveisManut(){
+  const set = new Set();
+  MANUT_EVENTOS.forEach(e => {
+    const d = parseDataManut(e.data);
+    if(!d) return;
+    set.add(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+  });
+  return Array.from(set).sort().reverse();
+}
+function abrirRelatorioManut(){
+  const select = $('manutReportMonth'); const meses = getMesesDisponiveisManut();
+  select.innerHTML = '<option value="">Todos os meses</option>' + meses.map(ym => `<option value="${escapeAttr(ym)}">${escapeHtml(formatarMesAno(ym))}</option>`).join('');
+  select.value = '';
+  $('manutReportMode').value = 'detalhado';
+  const selStatus = $('manutReportStatus'); if(selStatus) selStatus.value = '';
+  manutRepStatusFiltro = '';
+  const agora = new Date();
+  $('manutReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
+  renderRelatorioManut();
+  _abrirReportModal('manutReportModal');
+}
+function atualizarVisibilidadeModoManut(){
+  const modo = $('manutReportMode').value;
+  const isMes = modo === 'mes';
+  $('manutReportDetalhado').style.display = isMes ? 'none' : '';
+  $('manutReportPorMes').style.display = isMes ? '' : 'none';
+  const periodoWrap = $('manutReportPeriodWrap');
+  if(periodoWrap) periodoWrap.style.display = isMes ? 'none' : 'flex';
+}
+function renderRelatorioManut(){
+  atualizarVisibilidadeModoManut();
+  const modo = $('manutReportMode').value;
+  if(modo === 'mes') renderRelatorioManutPorMes();
+  else renderRelatorioManutDetalhado();
+}
+function renderRelatorioManutDetalhado(){
+  const mes = $('manutReportMonth').value;
+  const grupos = agruparPorProcesso();
+  let procs = Object.values(grupos);
+  if(mes){
+    procs = procs.filter(p => {
+      const d = parseDataManut(p.entrada ? p.entrada.data : '');
+      if(!d) return false;
+      return (d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')) === mes;
+    });
+  }
+  if(manutRepStatusFiltro){
+    const alvoClasse = statusClasseManut(manutRepStatusFiltro);
+    procs = procs.filter(p => statusClasseManut(p.ultimo ? p.ultimo.status : '') === alvoClasse);
+  }
+  procs.sort((a, b) => {
+    const da = parseDataManut(a.entrada ? a.entrada.data : '');
+    const db = parseDataManut(b.entrada ? b.entrada.data : '');
+    return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
+  });
+  const filtroTxt = mes ? 'Mês: ' + formatarMesAno(mes) : 'Todos os meses';
+  const statusTxt = manutRepStatusFiltro ? ' · Status: ' + escapeHtml(manutRepStatusFiltro) : '';
+  $('manutReportFilters').innerHTML = '<b>' + escapeHtml(filtroTxt) + '</b>' + statusTxt + ' · <b>Processos:</b> ' + procs.length;
+  $('manutReportBody').innerHTML = procs.length === 0
+    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhum processo neste período</td></tr>'
+    : procs.map(p => {
+        const cor = corStatus(statusClasseManut(p.ultimo ? p.ultimo.status : ''));
+        const entrada = p.entrada ? p.entrada.data : '—';
+        const saida = p.finalizacao ? p.finalizacao.data : '--';
+        const statusL = statusLabelManut(p.ultimo ? p.ultimo.status : '');
+        const temDias = p.finalizacao && p.dias > 0;
+        const diasTxt = temDias ? p.dias + 'd' : '—';
+        const diasClass = temDias ? 'dias' : 'dias vazio';
+        const inf = p.finalizacao ? p.finalizacao.informante : (p.entrada ? p.entrada.informante : '—');
+        const tipoProc = p.tipo || TIPO_VIATURA;
+        const tipoClass = tipoProc === TIPO_OUTRO ? 'outro' : (tipoProc === TIPO_AGENDAMENTO ? 'agendamento' : 'viatura');
+        return `<tr>
+          <td class="id">${escapeHtml(p.id)}</td>
+          <td><span class="manut-proc-tipo ${tipoClass}">${escapeHtml(tipoProc)}</span></td>
+          <td class="v">${escapeHtml(p.viatura)}</td>
+          <td class="date">${escapeHtml(entrada)}</td>
+          <td class="date">${escapeHtml(saida)}</td>
+          <td class="status" style="color:${cor};">● ${escapeHtml(statusL)}</td>
+          <td class="${diasClass}">${escapeHtml(diasTxt)}</td>
+          <td style="text-align:center;">${p.eventos.length}</td>
+          <td class="info">${escapeHtml(inf)}</td>
+        </tr>`;
+      }).join('');
+}
+function renderRelatorioManutPorMes(){
+  const grupos = {};
+  MANUT_EVENTOS.forEach(e => {
+    if(manutRepStatusFiltro){
+      const alvoClasse = statusClasseManut(manutRepStatusFiltro);
+      if(statusClasseManut(e.status) !== alvoClasse) return;
+    }
+    const d = parseDataManut(e.data);
+    if(!d) return;
+    const ym = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    if(!grupos[ym]) grupos[ym] = {};
+    if(!grupos[ym][e.viatura]) grupos[ym][e.viatura] = { eventos: 0, dias: 0 };
+    grupos[ym][e.viatura].eventos += 1;
+    if(normalizeStr(e.evento).indexOf('finaliz') !== -1){
+      grupos[ym][e.viatura].dias += extrairDiasNumericos(e.dias);
+    }
+  });
+  const meses = Object.keys(grupos).sort().reverse();
+  let totalGeralEventos = 0;
+  Object.keys(grupos).forEach(ym => { Object.keys(grupos[ym]).forEach(pfx => { totalGeralEventos += grupos[ym][pfx].eventos; }); });
+  const statusTxt = manutRepStatusFiltro ? ' · Status: ' + escapeHtml(manutRepStatusFiltro) : '';
+  $('manutReportFilters').innerHTML = '<b>Modo:</b> Por mês (agrupado)' + statusTxt + ' · <b>Meses:</b> ' + meses.length + ' · <b>Eventos totais:</b> ' + totalGeralEventos;
+  const container = $('manutReportMesContent');
+  if(meses.length === 0){
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-faint);">Nenhum registro encontrado</div>';
+    return;
+  }
+  container.innerHTML = meses.map(ym => {
+    const viaturas = Object.keys(grupos[ym]).sort((a,b)=>a.localeCompare(b));
+    let totalEventosMes = 0, totalDiasMes = 0;
+    const linhas = viaturas.map(pfx => {
+      const info = grupos[ym][pfx];
+      totalEventosMes += info.eventos;
+      totalDiasMes += info.dias;
+      return `<tr><td class="v">${escapeHtml(pfx)}</td><td class="status" style="text-align:center;">${info.eventos}</td><td class="dias">${info.dias}d</td></tr>`;
+    }).join('');
+    return `<div class="mes-group"><div class="mes-header"><span>${escapeHtml(formatarMesAno(ym))}</span><span class="mes-count">${totalEventosMes} evento${totalEventosMes>1?'s':''} · ${viaturas.length} viatura${viaturas.length>1?'s':''}</span></div><table class="report-table"><thead><tr><th>Viatura</th><th style="text-align:center;">Eventos</th><th style="text-align:right;">Dias fechados</th></tr></thead><tbody>${linhas}<tr class="total-row"><td>TOTAL DO MÊS</td><td style="text-align:center;">${totalEventosMes}</td><td style="text-align:right;">${totalDiasMes}d</td></tr></tbody></table></div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PREVENTIVA
+// ═══════════════════════════════════════════════════════════════════════════
+const STORAGE_KEY_PREV = 'deman_cache_preventiva_v1';
+const PREV_CACHE_TTL   = 2 * 60 * 1000;
+let PREV_VIATURAS = [];
+let PREV_FILTRO_SITUACAO = '';
+let PREV_FILTRO_OLEO = '';
+function parseDataBR(str){
+  var m = String(str||'').match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(!m) return null;
+  var d = new Date(+m[3], +m[2]-1, +m[1]);
+  if(d.getFullYear() < 1950) return null;
+  return d;
+}
+function formatarGarantiaPrev(g){
+  var s = String(g||'').trim().toUpperCase();
+  if(!s || s === '0') return '—';
+  if(s.indexOf('VENCID') !== -1) return 'Garantia VENCIDA';
+  var m = s.match(/FAZER\s+(\d)/);
+  if(m) return 'Garantia na ' + m[1] + '\u00AA revis\u00E3o';
+  return s;
+}
+function fmtKm(n){
+  if(n == null || isNaN(n)) return '—';
+  return Number(n).toLocaleString('pt-BR') + ' km';
+}
+async function loadDataPreventiva(){
+  if(activeView !== 'preventiva' && !PREV_VIATURAS.length) return;
+  var upd = $('prevUpdateStatus'); if(!upd) return;
+  if(!PREVENTIVA_APPS_SCRIPT_URL || PREVENTIVA_APPS_SCRIPT_URL.indexOf('COLE_AQUI') !== -1){
+    upd.textContent = 'Backend não configurado.';
+    $('prevContent').innerHTML = '<div class="prev-empty">Backend não configurado.</div>';
+    return;
+  }
+  try{
+    var raw = sessionStorage.getItem(STORAGE_KEY_PREV);
+    if(raw){
+      var p = JSON.parse(raw);
+      if(p && Array.isArray(p.viaturas) && (Date.now() - p.ts) < PREV_CACHE_TTL){
+        PREV_VIATURAS = p.viaturas;
+        upd.textContent = 'Cache · ' + new Date(p.ts).toLocaleTimeString('pt-BR');
+        renderPreventiva();
+      }
+    }
+  }catch(e){}
+  upd.textContent = 'Atualizando…';
+  try{
+    var r = await apiPrev('listarPreventiva');
+    if(!r.ok){ upd.textContent = 'Falha: ' + (r.error || 'desconhecido'); return; }
+    PREV_VIATURAS = Array.isArray(r.viaturas) ? r.viaturas : [];
+    try{ sessionStorage.setItem(STORAGE_KEY_PREV, JSON.stringify({ ts: Date.now(), viaturas: PREV_VIATURAS })); }catch(e){}
+    upd.textContent = 'Atualizado em ' + new Date().toLocaleTimeString('pt-BR');
+    renderPreventiva();
+  }catch(err){
+    console.error(err);
+    upd.textContent = 'Erro: ' + err.message;
+  }
+}
+function renderCardPreventiva(v){
+  var cor = v.statusOleo || 'vazio';
+  var faixaLabel, faixaValor, faixaIcone;
+  if(cor === 'vazio'){
+    faixaLabel = 'Sem dados de km';
+  } else {
+    faixaValor = Math.abs(v.falta || 0);
+    faixaLabel = (v.falta <= 0 ? 'PASSOU ' : 'FALTAM ') + faixaValor.toLocaleString('pt-BR') + ' km';
+    faixaIcone = cor === 'vermelho' ? '🔴 ' : (cor === 'amarelo' ? '🟡 ' : '🟢 ');
+  }
+  var dataProx = v.proximaTroca || '';
+  var dataVencida = false;
+  if(dataProx){
+    var d = parseDataBR(dataProx);
+    if(d && d < new Date()) dataVencida = true;
+  }
+  var kmProxAtrasada = (v.kmProxima != null && v.kmAtual != null && v.kmProxima <= v.kmAtual);
+  return '<div class="prev-card ' + cor + '">' +
+    '<div class="prev-head">' +
+      '<div class="prev-titulo">' +
+        '<span class="prev-prefixo">' + escapeHtml(v.prefixo) + '</span>' +
+        '<span class="prev-placa">' + escapeHtml(v.placa) + '</span>' +
+      '</div>' +
+      '<div class="prev-sub">' +
+        '<span>' + escapeHtml(v.situacao || '—') + '</span>' +
+        '<span class="sep">·</span>' +
+        '<span>' + escapeHtml(formatarGarantiaPrev(v.garantia)) + '</span>' +
+      '</div>' +
+    '</div>' +
+    '<div class="prev-body">' +
+      '<div class="prev-row"><span class="lbl">KM atual</span><span class="val">' + fmtKm(v.kmAtual) + '</span></div>' +
+      '<div class="prev-row"><span class="lbl">Pr\u00F3x. troca</span><span class="val' + (kmProxAtrasada ? ' atraso' : '') + '">' + fmtKm(v.kmProxima) + '</span></div>' +
+      (v.osTroca ? '<div class="prev-row"><span class="lbl">OS troca</span><span class="val">' + escapeHtml(v.osTroca) + '</span></div>' : '') +
+      '<div class="prev-data">📅 ' + (dataProx || '—') + (dataVencida ? ' <span class="vencida">· vencida</span>' : '') + '</div>' +
+    '</div>' +
+    '<div class="prev-faixa ' + cor + '">' + (faixaIcone || '') + escapeHtml(faixaLabel) + '</div>' +
+  '</div>';
+}
+function renderPreventiva(){
+  if(activeView !== 'preventiva') return;
+  var container = $('prevContent'); if(!container) return;
+  var q = normalizeStr($('prevSearch').value);
+  var lista = PREV_VIATURAS.slice();
+  if(PREV_FILTRO_SITUACAO){
+    var alvo = normalizeStr(PREV_FILTRO_SITUACAO);
+    lista = lista.filter(function(v){ return normalizeStr(v.situacao).indexOf(alvo) !== -1; });
+  }
+  if(PREV_FILTRO_OLEO){
+    lista = lista.filter(function(v){ return v.statusOleo === PREV_FILTRO_OLEO; });
+  }
+  if(q){
+    lista = lista.filter(function(v){
+      return normalizeStr(v.prefixo).indexOf(q) !== -1 || normalizeStr(v.placa).indexOf(q) !== -1;
+    });
+  }
+  var ordem = { vermelho:0, amarelo:1, verde:2, vazio:3 };
+  lista.sort(function(a, b){
+    var oa = ordem[a.statusOleo] == null ? 3 : ordem[a.statusOleo];
+    var ob = ordem[b.statusOleo] == null ? 3 : ordem[b.statusOleo];
+    if(oa !== ob) return oa - ob;
+    return String(a.prefixo).localeCompare(String(b.prefixo));
+  });
+  var qtdAtrasadas = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'vermelho'; }).length;
+  var qtdProximas  = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'amarelo'; }).length;
+  var qtdEmDia     = PREV_VIATURAS.filter(function(v){ return v.statusOleo === 'verde'; }).length;
+  var clsAtras = PREV_FILTRO_OLEO === 'vermelho' ? ' active-filter' : '';
+  var clsProx  = PREV_FILTRO_OLEO === 'amarelo'  ? ' active-filter' : '';
+  var clsDia   = PREV_FILTRO_OLEO === 'verde'    ? ' active-filter' : '';
+  $('prevSummary').innerHTML =
+    '<div class="summary-card baixadas' + clsAtras + '" data-prev-filter="vermelho"><div class="label">🔴 Óleo atrasado (km)</div><div class="value">' + qtdAtrasadas + '</div></div>' +
+    '<div class="summary-card manut-abertos' + clsProx + '" data-prev-filter="amarelo"><div class="label">🟡 Próximas da troca</div><div class="value">' + qtdProximas + '</div></div>' +
+    '<div class="summary-card manut-fechados' + clsDia + '" data-prev-filter="verde"><div class="label">🟢 Em dia</div><div class="value">' + qtdEmDia + '</div></div>';
+  document.querySelectorAll('#prevSummary .summary-card').forEach(function(card){
+    card.addEventListener('click', function(){
+      var f = card.dataset.prevFilter;
+      PREV_FILTRO_OLEO = (PREV_FILTRO_OLEO === f) ? '' : f;
+      var sel = $('prevFiltroOleo'); if(sel) sel.value = PREV_FILTRO_OLEO;
+      renderPreventiva();
+    });
+  });
+  if(lista.length === 0){
+    container.innerHTML = '<div class="prev-empty">Nenhuma viatura encontrada.</div>';
+    var cb0 = $('prevClearFilterBtn'); if(cb0) cb0.style.display = (PREV_FILTRO_SITUACAO || PREV_FILTRO_OLEO || q) ? 'inline-block' : 'none';
+    return;
+  }
+  container.innerHTML = lista.map(renderCardPreventiva).join('');
+  var cb = $('prevClearFilterBtn');
+  if(cb) cb.style.display = (PREV_FILTRO_SITUACAO || PREV_FILTRO_OLEO || q) ? 'inline-block' : 'none';
+}
+
+let PREV_TAB_ATUAL = 'painel';
+let PREV_LISTA_COMPLETA = [];
+let PREV_VIATURA_SELECIONADA = null;
+function setSidebarPrevExpanded(v){
+  var sub = $('sidebarSubPrev'); var parent = $('sidebarPrevParent');
+  if(sub) sub.classList.toggle('open', !!v);
+  if(parent) parent.classList.toggle('expanded', !!v);
+}
+function showPrevTab(name){
+  if(name !== 'painel' && name !== 'atualizar' && name !== 'pneus') return;
+  if(name === 'atualizar' && !temPermissao('prev_editar_km')) name = 'painel';
+  if(name === 'pneus' && !temPermissao('prev_editar_km')) name = 'painel';
+  PREV_TAB_ATUAL = name;
+  document.querySelectorAll('#sidebarSubPrev .sidebar-sublink').forEach(b => { b.classList.toggle('active', b.dataset.prevTab === name); });
+  var pPainel = $('prevPanel-painel'); var pAtual = $('prevPanel-atualizar'); var pPneus = $('prevPanel-pneus');
+  if(pPainel) pPainel.classList.toggle('active', name === 'painel');
+  if(pAtual)  pAtual.classList.toggle('active', name === 'atualizar');
+  if(pPneus)  pPneus.classList.toggle('active', name === 'pneus');
+  setSidebarPrevExpanded(true);
+  window.scrollTo(0, 0);
+  if(name === 'atualizar'){
+    if(PREV_LISTA_COMPLETA.length === 0) loadListaCompletaPreventiva();
+    setTimeout(() => { var i = $('pf-busca'); if(i) i.focus({ preventScroll: true }); }, 60);
+  }
+  if(name === 'pneus'){
+    if(PREV_LISTA_COMPLETA.length === 0) loadListaCompletaPreventiva();
+    setTimeout(() => { var i = $('pneus-busca'); if(i) i.focus({ preventScroll: true }); }, 60);
+  }
+}
+async function loadListaCompletaPreventiva(){
+  try{
+    var r = await apiPrev('listarTodasViaturas');
+    if(!r.ok){ console.error('listarTodasViaturas:', r.error); return; }
+    PREV_LISTA_COMPLETA = Array.isArray(r.viaturas) ? r.viaturas : [];
+  }catch(e){ console.error(e); }
+}
+function _fmtKmPrev(n){ if(n == null || isNaN(n)) return '—'; return Number(n).toLocaleString('pt-BR') + ' km'; }
+function _fmtDataISOparaBR(iso){
+  if(!iso) return '';
+  var p = String(iso).split('-');
+  if(p.length !== 3) return iso;
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+function selecionarViaturaPreventiva(prefixo){
+  var v = PREV_LISTA_COMPLETA.find(function(x){ return x.prefixo === prefixo; });
+  if(!v) return;
+  PREV_VIATURA_SELECIONADA = v;
+  $('pf-info').classList.add('show');
+  $('pf-info-prefixo').textContent = v.prefixo + (v.locado ? ' · locada' : '');
+  $('pf-info-placa').textContent = v.placa || '—';
+  $('pf-info-km').textContent = _fmtKmPrev(v.kmAtual);
+  $('pf-info-data').textContent = v.ultimaTroca || '—';
+  $('pf-info-kmtroca').textContent = _fmtKmPrev(v.kmUltima);
+  $('pf-info-os').textContent = v.osTroca || '—';
+  $('pf-busca-dica').textContent = 'Viatura selecionada.';
+  atualizarDicaKm();
+}
+function atualizarDicaKm(){
+  var dica = $('pf-km-dica'); if(!dica) return;
+  var raw = $('pf-km').value.trim();
+  if(!raw){ dica.textContent = '—'; dica.className = 'dica'; return; }
+  var n = parseFloat(raw.replace(/\./g,'').replace(',', '.'));
+  if(isNaN(n)){ dica.textContent = 'Valor inválido.'; dica.className = 'dica negativo'; return; }
+  if(!PREV_VIATURA_SELECIONADA || PREV_VIATURA_SELECIONADA.kmAtual == null){
+    dica.textContent = 'Sem referência anterior.'; dica.className = 'dica'; return;
+  }
+  var antigo = PREV_VIATURA_SELECIONADA.kmAtual;
+  var dif = n - antigo;
+  var sinal = dif >= 0 ? '+' : '';
+  dica.textContent = sinal + dif.toLocaleString('pt-BR') + ' km (antes: ' + antigo.toLocaleString('pt-BR') + ')';
+  dica.className = 'dica ' + (dif < 0 ? 'negativo' : 'positivo');
+}
+function limparFormularioPreventiva(){
+  PREV_VIATURA_SELECIONADA = null;
+  $('pf-busca').value = '';
+  $('pf-busca-dica').textContent = 'Digite para filtrar. Selecione uma viatura para continuar.';
+  $('pf-info').classList.remove('show');
+  $('pf-km').value = '';
+  $('pf-km-dica').textContent = '—';
+  $('pf-km-dica').className = 'dica';
+  $('pf-data').value = '';
+  $('pf-kmtroca').value = '';
+  $('pf-os').value = '';
+  $('pf-error').style.display = 'none';
+  $('pf-error').textContent = '';
+  fecharDropdownViaturas();
+}
+async function salvarPreventivaForm(){
+  var err = $('pf-error'); var btn = $('pf-save');
+  err.style.display = 'none'; err.textContent = '';
+  if(!PREV_VIATURA_SELECIONADA){ err.textContent = 'Selecione uma viatura primeiro.'; err.style.display = 'block'; return; }
+  var kmRaw = $('pf-km').value.trim();
+  var dataTroca = $('pf-data').value;
+  var kmTrocaRaw = $('pf-kmtroca').value.trim();
+  var osTroca = $('pf-os').value.trim();
+  var temKm = kmRaw !== '';
+  var preencheuAlgoTroca = (dataTroca || kmTrocaRaw || osTroca);
+  var trocaCompleta = (dataTroca && kmTrocaRaw && osTroca);
+  if(!temKm && !preencheuAlgoTroca){ err.textContent = 'Preencha o KM atual ou os campos da troca.'; err.style.display = 'block'; return; }
+  if(preencheuAlgoTroca && !trocaCompleta){ err.textContent = 'A troca de óleo precisa dos 3 campos: data, KM e OS.'; err.style.display = 'block'; return; }
+  if(temKm && PREV_VIATURA_SELECIONADA.kmAtual != null){
+    var novoKm = parseFloat(kmRaw.replace(/\./g,'').replace(',', '.'));
+    if(!isNaN(novoKm) && novoKm < PREV_VIATURA_SELECIONADA.kmAtual){
+      var antigoFmt = PREV_VIATURA_SELECIONADA.kmAtual.toLocaleString('pt-BR');
+      var novoFmt = novoKm.toLocaleString('pt-BR');
+      if(!confirm('⚠️ O novo KM (' + novoFmt + ') é menor que o atual (' + antigoFmt + ').\n\nConfirma?')) return;
+    }
+  }
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  var payload = { prefixo: PREV_VIATURA_SELECIONADA.prefixo };
+  if(temKm) payload.novoKm = kmRaw;
+  if(trocaCompleta){
+    payload.dataTroca = _fmtDataISOparaBR(dataTroca);
+    payload.kmTroca = kmTrocaRaw;
+    payload.osTroca = osTroca;
+  }
+  let r;
+  try {
+    r = await apiPrev('salvarPreventiva', payload);
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar';
+  }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
+  var resumo = [];
+  if(r.acoes && r.acoes.km){
+    var a = r.acoes.km;
+    var dif = a.diferenca != null ? (a.diferenca >= 0 ? '+' : '') + a.diferenca.toLocaleString('pt-BR') : '—';
+    resumo.push(['KM atual', (a.kmAntigo != null ? a.kmAntigo.toLocaleString('pt-BR') : '—') + ' → ' + a.kmNovo.toLocaleString('pt-BR') + ' (' + dif + ')']);
+  }
+  if(r.acoes && r.acoes.troca){
+    var t = r.acoes.troca;
+    resumo.push(['Data da troca', t.dataTroca]);
+    resumo.push(['KM da troca', Number(t.kmTroca).toLocaleString('pt-BR') + ' km']);
+    resumo.push(['OS da troca', t.osTroca]);
+  }
+  limparFormularioPreventiva();
+  try{ sessionStorage.removeItem(STORAGE_KEY_PREV); }catch(e){}
+  await Promise.all([loadListaCompletaPreventiva(), loadDataPreventiva()]);
+  mostrarSucesso({ titulo: 'Manutenção registrada!', sub: 'Viatura: ' + payload.prefixo, resumo: resumo, mensagemWhats: '' });
+}
+function _normalizaBusca(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim(); }
+function renderDropdownViaturas(){
+  const input = $('pf-busca'); const dropdown = $('pf-dropdown');
+  if(!input || !dropdown) return;
+  const termo = _normalizaBusca(input.value);
+  if(!termo){ dropdown.classList.remove('open'); dropdown.innerHTML = ''; return; }
+  const matches = PREV_LISTA_COMPLETA.filter(v => {
+    const pfx = _normalizaBusca(v.prefixo);
+    const placa = _normalizaBusca(v.placa || '');
+    return pfx.indexOf(termo) !== -1 || placa.indexOf(termo) !== -1;
+  }).slice(0, 30);
+  if(matches.length === 0){
+    dropdown.innerHTML = '<div class="pf-dropdown-empty">Nenhuma viatura encontrada para "' + escapeHtml(input.value) + '"</div>';
+    dropdown.classList.add('open');
+    return;
+  }
+  dropdown.innerHTML = matches.map(v => {
+    const placaTxt = v.placa ? v.placa : '—';
+    const locTxt = v.locado ? ' · locada' : '';
+    return `<div class="pf-dropdown-item" data-prefixo="${escapeAttr(v.prefixo)}">
+      <span class="pf-di-prefix">${escapeHtml(v.prefixo)}${escapeHtml(locTxt)}</span>
+      <span class="pf-di-placa">${escapeHtml(placaTxt)}</span>
+    </div>`;
+  }).join('');
+  dropdown.classList.add('open');
+  dropdown.querySelectorAll('.pf-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const pfx = item.dataset.prefixo;
+      input.value = pfx;
+      selecionarViaturaPreventiva(pfx);
+      fecharDropdownViaturas();
+    });
+  });
+}
+function fecharDropdownViaturas(){
+  const dropdown = $('pf-dropdown');
+  if(dropdown) dropdown.classList.remove('open');
+}
+function _handlePfBuscaInput(){
+  const input = $('pf-busca'); if(!input) return;
+  const val = input.value.trim().toUpperCase();
+  const exato = PREV_LISTA_COMPLETA.find(v => v.prefixo.toUpperCase() === val);
+  if(exato){ selecionarViaturaPreventiva(exato.prefixo); fecharDropdownViaturas(); return; }
+  PREV_VIATURA_SELECIONADA = null;
+  $('pf-info').classList.remove('show');
+  $('pf-busca-dica').textContent = 'Digite para filtrar. Selecione uma viatura para continuar.';
+  renderDropdownViaturas();
+}
+
+let _viaturaSelecionadaPneu = null;
+function selecionarViaturaPneu(v){
+  _viaturaSelecionadaPneu = v;
+  $('pneus-busca').value = v.prefixo + ' — ' + (v.placa || '');
+  $('pneus-dropdown').classList.remove('open');
+  $('pneus-info').style.display = 'block';
+  $('pneus-info-prefixo').textContent = v.prefixo;
+  $('pneus-info-placa').textContent = v.placa || '—';
+  $('pneus-busca-dica').textContent = 'Viatura selecionada.';
+  $('pneus-data').value = '';
+  $('pneus-km').value = '';
+  $('pneus-marca').value = '';
+  $('pneus-os').value = '';
+}
+async function salvarPneusForm(){
+  const err = $('pneus-error'); err.style.display = 'none';
+  if(!_viaturaSelecionadaPneu){ err.textContent = 'Selecione uma viatura.'; err.style.display = 'block'; return; }
+  const data = $('pneus-data').value.trim();
+  const km = $('pneus-km').value.trim();
+  const marca = $('pneus-marca').value.trim();
+  const os = $('pneus-os').value.trim();
+  if(!data && !km && !marca && !os){ err.textContent = 'Preencha ao menos um campo.'; err.style.display = 'block'; return; }
+  const btn = $('pneus-save'); btn.disabled = true; btn.textContent = 'Salvando…';
+  const payload = {
+    prefixo: _viaturaSelecionadaPneu.prefixo,
+    data: data || null,
+    km: km || null,
+    marca: marca || null,
+    os: os || null
+  };
+  const r = await apiPrev('salvarPneus', payload);
+  btn.disabled = false; btn.textContent = 'Salvar';
+  if(!r.ok){ err.textContent = r.error || 'Falha ao salvar pneus.'; err.style.display = 'block'; return; }
+  try{ sessionStorage.removeItem(STORAGE_KEY_PREV); }catch(e){}
+  await loadDataPreventiva();
+  $('pneus-cancel').click();
+  alert('Dados de pneus salvos com sucesso!');
+}
+function renderDropdownPneus(){
+  const input = $('pneus-busca'); const dropdown = $('pneus-dropdown');
+  if(!input || !dropdown) return;
+  const termo = _normalizaBusca(input.value);
+  if(!termo){ dropdown.classList.remove('open'); dropdown.innerHTML = ''; return; }
+  const matches = PREV_LISTA_COMPLETA.filter(v => {
+    const pfx = _normalizaBusca(v.prefixo);
+    const placa = _normalizaBusca(v.placa || '');
+    return pfx.indexOf(termo) !== -1 || placa.indexOf(termo) !== -1;
+  }).slice(0, 30);
+  if(matches.length === 0){
+    dropdown.innerHTML = '<div class="pf-dropdown-empty">Nenhuma viatura encontrada para "' + escapeHtml(input.value) + '"</div>';
+    dropdown.classList.add('open');
+    return;
+  }
+  dropdown.innerHTML = matches.map(v => {
+    const placaTxt = v.placa ? v.placa : '—';
+    const locTxt = v.locado ? ' · locada' : '';
+    return `<div class="pf-dropdown-item" data-prefixo="${escapeAttr(v.prefixo)}">
+      <span class="pf-di-prefix">${escapeHtml(v.prefixo)}${escapeHtml(locTxt)}</span>
+      <span class="pf-di-placa">${escapeHtml(placaTxt)}</span>
+    </div>`;
+  }).join('');
+  dropdown.classList.add('open');
+  dropdown.querySelectorAll('.pf-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const pfx = item.dataset.prefixo;
+      input.value = pfx;
+      selecionarViaturaPneu(matches.find(x => x.prefixo === pfx));
+      dropdown.classList.remove('open');
+    });
+  });
+}
+function _handlePneusBuscaInput(){
+  const input = $('pneus-busca'); if(!input) return;
+  const val = input.value.trim().toUpperCase();
+  const exato = PREV_LISTA_COMPLETA.find(v => v.prefixo.toUpperCase() === val);
+  if(exato){ selecionarViaturaPneu(exato); $('pneus-dropdown').classList.remove('open'); return; }
+  _viaturaSelecionadaPneu = null;
+  $('pneus-info').style.display = 'none';
+  $('pneus-busca-dica').textContent = 'Selecione uma viatura para continuar.';
+  renderDropdownPneus();
+}
+
+let prevRepFiltroOleo = [];
+let prevRepFiltroPrevisao = '';
+let prevRepFiltroKm = '';
+let prevRepFiltroBusca = '';
+let prevRepFiltroGarantia = '';
+function prevRepGarantiaStatus(v){
+  const s = String(v.garantia||'').trim().toUpperCase();
+  if(!s || s === '0') return 'sem_dados';
+  return s.indexOf('VENCID') !== -1 ? 'vencida' : 'em_garantia';
+}
+
+function prevRepLerOleoSelecionado(){
+  const group = $('prevRepFilterOleoGroup');
+  if(!group) return [];
+  return Array.from(group.querySelectorAll('input:checked')).map(cb => cb.value);
+}
+function prevRepSetOleoSelecionado(valores){
+  const group = $('prevRepFilterOleoGroup');
+  if(!group) return;
+  const arr = Array.isArray(valores) ? valores : [];
+  prevRepFiltroOleo = arr.slice();
+  group.querySelectorAll('.multi-check').forEach(lbl => {
+    const cb = lbl.querySelector('input');
+    const on = arr.includes(cb.value);
+    cb.checked = on;
+    lbl.classList.toggle('checked', on);
+  });
+}
+
+function calcularPrevisaoTroca(v){
+  if(v.falta != null && v.falta <= 0){ return { data: new Date(), vencida: true, origem: 'atrasada' }; }
+  if(v.proximaTroca){
+    const d = parseDataBR(v.proximaTroca);
+    if(d && d.getFullYear() >= 2020){ return { data: d, vencida: false, origem: 'planilha' }; }
+  }
+  if(v.kmAtual != null && v.kmProxima != null && v.falta != null && v.falta > 0){
+    let kmPorMes = 1500;
+    if(v.ultimaTroca && v.kmUltima != null && v.kmUltima < v.kmAtual){
+      const dtUltima = parseDataBR(v.ultimaTroca);
+      if(dtUltima && dtUltima.getTime() < Date.now()){
+        const meses = Math.max(0.5, (Date.now() - dtUltima.getTime()) / (30 * 86400000));
+        const kmRodados = v.kmAtual - v.kmUltima;
+        if(kmRodados > 100) kmPorMes = kmRodados / meses;
+      }
+    }
+    if(kmPorMes > 0 && isFinite(kmPorMes)){
+      const mesesAte = Math.min(120, v.falta / kmPorMes);
+      const previsao = new Date();
+      previsao.setDate(previsao.getDate() + Math.round(mesesAte * 30));
+      return { data: previsao, vencida: false, origem: 'estimada' };
+    }
+  }
+  return null;
+}
+function prevRepPopularPrevisao(lista){
+  const meses = new Set();
+  let temVencidas = false;
+  lista.forEach(v => {
+    const p = calcularPrevisaoTroca(v);
+    if(!p) return;
+    if(p.vencida){ temVencidas = true; return; }
+    meses.add(p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0'));
+  });
+  const sel = $('prevRepFilterPrevisao'); if(!sel) return;
+  const mesesOrd = Array.from(meses).sort();
+  let html = '<option value="">Todas</option>';
+  if(temVencidas) html += '<option value="__vencidas__">⚠ Vencidas (atrasadas)</option>';
+  html += mesesOrd.map(ym => {
+    const selAttr = (prevRepFiltroPrevisao === ym) ? ' selected' : '';
+    return `<option value="${escapeAttr(ym)}"${selAttr}>${escapeHtml(formatarMesAno(ym))}</option>`;
+  }).join('');
+  sel.innerHTML = html;
+  sel.value = prevRepFiltroPrevisao;
+}
+function prevRepAplicarFiltros(lista){
+  return lista.filter(v => {
+    if(prevRepFiltroOleo && prevRepFiltroOleo.length && !prevRepFiltroOleo.includes(v.statusOleo)) return false;
+    if(prevRepFiltroPrevisao){
+      const p = calcularPrevisaoTroca(v);
+      if(prevRepFiltroPrevisao === '__vencidas__'){
+        if(!p || !p.vencida) return false;
+      } else {
+        if(!p || p.vencida) return false;
+        const ym = p.data.getFullYear() + '-' + String(p.data.getMonth()+1).padStart(2,'0');
+        if(ym !== prevRepFiltroPrevisao) return false;
+      }
+    }
+    if(prevRepFiltroGarantia && prevRepGarantiaStatus(v) !== prevRepFiltroGarantia) return false;
+    if(prevRepFiltroKm){
+      if(prevRepFiltroKm === 'sem_dados'){
+        if(v.kmAtual != null && v.kmProxima != null) return false;
+      } else {
+        if(v.falta == null || v.kmAtual == null || v.kmProxima == null) return false;
+        if(prevRepFiltroKm === 'atrasado' && v.falta > 0) return false;
+        if(prevRepFiltroKm === 'curto' && (v.falta <= 0 || v.falta > 2000)) return false;
+        if(prevRepFiltroKm === 'medio' && (v.falta <= 2000 || v.falta > 5000)) return false;
+        if(prevRepFiltroKm === 'longo' && v.falta <= 5000) return false;
+      }
+    }
+    if(prevRepFiltroBusca){
+      const q = normalizeStr(prevRepFiltroBusca);
+      if(!normalizeStr(v.prefixo).includes(q) && !normalizeStr(v.placa).includes(q)) return false;
+    }
+    return true;
+  });
+}
+function prevRepRenderKpis(lista){
+  const total = lista.length;
+  const atrasadas = lista.filter(v => v.statusOleo === 'vermelho').length;
+  const proximas = lista.filter(v => v.statusOleo === 'amarelo').length;
+  const emDia = lista.filter(v => v.statusOleo === 'verde').length;
+  const semDados = lista.filter(v => v.statusOleo === 'vazio').length;
+  const semPrevisao = lista.filter(v => !calcularPrevisaoTroca(v)).length;
+  $('prevReportKpis').innerHTML = `
+    <div class="report-kpi kpi-total"><div class="kpi-label">Total</div><div class="kpi-value">${total}</div></div>
+    <div class="report-kpi kpi-pend"><div class="kpi-label">🔴 Atrasadas</div><div class="kpi-value" style="color:var(--vermelho);">${atrasadas}</div></div>
+    <div class="report-kpi kpi-qnt"><div class="kpi-label">🟡 Próximas</div><div class="kpi-value" style="color:var(--amber);">${proximas}</div></div>
+    <div class="report-kpi kpi-final"><div class="kpi-label">🟢 Em dia</div><div class="kpi-value" style="color:var(--verde);">${emDia}</div></div>
+    <div class="report-kpi kpi-aprov"><div class="kpi-label">— Sem dados</div><div class="kpi-value" style="color:var(--text-faint);">${semDados}</div></div>
+    <div class="report-kpi kpi-dist"><div class="kpi-label">Sem previsão</div><div class="kpi-value">${semPrevisao}</div></div>
+  `;
+}
+function prevRepRenderTabela(){
+  const base = PREV_VIATURAS.slice();
+  const dados = prevRepAplicarFiltros(base);
+  prevRepRenderKpis(dados);
+  const partes = [];
+  if(prevRepFiltroOleo && prevRepFiltroOleo.length){
+    const labels = { vermelho: 'Atrasadas', amarelo: 'Próximas', verde: 'Em dia', vazio: 'Sem dados' };
+    partes.push('Situação: ' + prevRepFiltroOleo.map(k => labels[k] || k).join(' + '));
+  }
+  if(prevRepFiltroPrevisao){
+    if(prevRepFiltroPrevisao === '__vencidas__') partes.push('Previsão: Vencidas');
+    else partes.push('Previsão: ' + formatarMesAno(prevRepFiltroPrevisao));
+  }
+  if(prevRepFiltroKm){
+    const labels = { atrasado: 'Atrasado', curto: '0–2.000', medio: '2.000–5.000', longo: '>5.000', sem_dados: 'Sem dados' };
+    partes.push('KM: ' + labels[prevRepFiltroKm]);
+  }
+  if(prevRepFiltroGarantia) partes.push('Garantia: ' + (prevRepFiltroGarantia === 'vencida' ? 'Vencida' : 'Em garantia'));
+  if(prevRepFiltroBusca) partes.push('Busca: "' + prevRepFiltroBusca + '"');
+  $('prevRepFilterResumo').innerHTML =
+    '<b>Filtros:</b> ' + (partes.length ? partes.map(escapeHtml).join(' · ') : 'nenhum') +
+    ' · <b>Exibindo:</b> ' + dados.length + ' de ' + base.length + ' viaturas';
+  const ordenado = dados.slice().sort((a, b) => {
+    const pa = calcularPrevisaoTroca(a); const pb = calcularPrevisaoTroca(b);
+    const ta = pa ? pa.data.getTime() : Infinity; const tb = pb ? pb.data.getTime() : Infinity;
+    if(ta !== tb) return ta - tb;
+    return a.prefixo.localeCompare(b.prefixo);
+  });
+  const hoje = new Date();
+  $('prevReportBody').innerHTML = ordenado.length === 0
+    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-faint);">Nenhuma viatura encontrada com os filtros atuais</td></tr>'
+    : ordenado.map(v => {
+        const p = calcularPrevisaoTroca(v);
+        let prevTxt = '—'; let prevCor = 'var(--text-faint)';
+        if(p){
+          if(p.vencida){ prevTxt = '⚠ VENCIDA'; prevCor = 'var(--vermelho)'; }
+          else {
+            prevTxt = p.data.toLocaleDateString('pt-BR');
+            if(p.origem === 'estimada') prevTxt += ' (est.)';
+            prevCor = p.data < new Date(hoje.getTime() + 30*86400000) ? 'var(--amber)' : 'var(--text)';
+          }
+        }
+        const faltaTxt = v.falta != null
+          ? (v.falta <= 0 ? '+' + Math.abs(v.falta).toLocaleString('pt-BR') + ' passou' : v.falta.toLocaleString('pt-BR') + ' km')
+          : '—';
+        const faltaCor = v.falta != null && v.falta <= 0 ? 'var(--vermelho)' : (v.falta != null && v.falta <= 2000 ? 'var(--amber)' : 'var(--text-dim)');
+        const statusOleoLabel = { vermelho: '🔴 Atrasada', amarelo: '🟡 Próxima', verde: '🟢 Em dia', vazio: '— Sem dados' }[v.statusOleo] || '—';
+        const statusOleoCor = { vermelho: 'var(--vermelho)', amarelo: 'var(--amber)', verde: 'var(--verde)' }[v.statusOleo] || 'var(--text-faint)';
+        return `<tr>
+          <td class="v">${escapeHtml(v.prefixo)}</td>
+          <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;">${escapeHtml(v.placa || '—')}</td>
+          <td style="font-size:11px;color:var(--text-dim);">${escapeHtml(v.situacao || '—')}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${v.kmAtual != null ? v.kmAtual.toLocaleString('pt-BR') : '—'}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;">${v.kmProxima != null ? v.kmProxima.toLocaleString('pt-BR') : '—'}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:11px;color:${faltaCor};">${faltaTxt}</td>
+          <td style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${prevCor};">${prevTxt}</td>
+          <td style="font-size:11px;color:${statusOleoCor};">${statusOleoLabel}</td>
+          <td style="font-size:11px;color:var(--text-dim);">${escapeHtml(formatarGarantiaPrev(v.garantia) || '—')}</td>
+        </tr>`;
+      }).join('');
+}
+function abrirRelatorioPreventiva(){
+  if(!PREV_VIATURAS.length){ alert('Carregando dados… Aguarde um instante e tente novamente.'); loadDataPreventiva(); return; }
+  prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = ''; prevRepFiltroGarantia = '';
+  prevRepSetOleoSelecionado([]);
+  $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = ''; $('prevRepFilterGarantia').value = '';
+  prevRepPopularPrevisao(PREV_VIATURAS);
+  const agora = new Date();
+  $('prevReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
+  const groupOleo = $('prevRepFilterOleoGroup');
+  const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const selGar = $('prevRepFilterGarantia'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
+  if(groupOleo && !groupOleo.dataset.bound){
+    groupOleo.dataset.bound = '1';
+    groupOleo.addEventListener('change', () => {
+      prevRepFiltroOleo = prevRepLerOleoSelecionado();
+      groupOleo.querySelectorAll('.multi-check').forEach(lbl => lbl.classList.toggle('checked', lbl.querySelector('input').checked));
+      prevRepRenderTabela();
+    });
+  }
+  if(selPrev && !selPrev.dataset.bound){ selPrev.dataset.bound = '1'; selPrev.addEventListener('change', () => { prevRepFiltroPrevisao = selPrev.value; prevRepRenderTabela(); }); }
+  if(selKm && !selKm.dataset.bound){ selKm.dataset.bound = '1'; selKm.addEventListener('change', () => { prevRepFiltroKm = selKm.value; prevRepRenderTabela(); }); }
+  if(selGar && !selGar.dataset.bound){ selGar.dataset.bound = '1'; selGar.addEventListener('change', () => { prevRepFiltroGarantia = selGar.value; prevRepRenderTabela(); }); }
+  if(inpBusca && !inpBusca.dataset.bound){ inpBusca.dataset.bound = '1'; inpBusca.addEventListener('input', debounce(() => { prevRepFiltroBusca = inpBusca.value; prevRepRenderTabela(); }, 180)); }
+  if(btnLimpar && !btnLimpar.dataset.bound){
+    btnLimpar.dataset.bound = '1';
+    btnLimpar.addEventListener('click', () => {
+      prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = ''; prevRepFiltroGarantia = '';
+      prevRepSetOleoSelecionado([]);
+      if(selPrev) selPrev.value = ''; if(selKm) selKm.value = ''; if(selGar) selGar.value = ''; if(inpBusca) inpBusca.value = '';
+      prevRepRenderTabela();
+    });
+  }
+  prevRepRenderTabela();
+  _abrirReportModal('prevReportModal');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// USUÁRIOS
+// ═══════════════════════════════════════════════════════════════════════════
+let USUARIOS_CACHE = [];
+async function carregarUsuarios(){
+  if(!podeVerUsuarios()) return;
+  const upd = $('usersUpdateStatus'); upd.textContent = 'Carregando…';
+  const r = await apiOS('listarUsuarios');
+  if(!r.ok){ upd.textContent = 'Falha: ' + (r.error || 'desconhecido'); $('usersContent').innerHTML = '<div class="empty">Não foi possível carregar os usuários.</div>'; return; }
+  USUARIOS_CACHE = Array.isArray(r.usuarios) ? r.usuarios : [];
+  upd.textContent = 'Atualizado em ' + new Date().toLocaleTimeString('pt-BR');
+  renderUsuarios();
+}
+function renderUsuarios(){
+  const q = normalizeStr($('usersSearch').value);
+  const filtrados = USUARIOS_CACHE.filter(u => { if(!q) return true; return normalizeStr(u.usuario).includes(q) || normalizeStr(u.nome).includes(q); });
+  const clearBtn = $('usersClearFilterBtn');
+  if(clearBtn) clearBtn.style.display = $('usersSearch').value.trim() ? 'inline-block' : 'none';
+  if(filtrados.length === 0){ $('usersContent').innerHTML = '<div class="empty">Nenhum usuário encontrado.</div>'; return; }
+  const podeCriar = temPermissao('usuarios_criar'); const podeEditar = temPermissao('usuarios_editar'); const podeResetar = temPermissao('usuarios_resetar');
+  const newBtn = $('newUserBtn'); if(newBtn) newBtn.style.display = podeCriar ? '' : 'none';
+  $('usersContent').innerHTML = filtrados.map(u => {
+    const ativo = normalizeStr(u.ativo) === 'sim'; const perms = u.permissoes || {};
+    const permsHtml = PERMISSOES_LISTA.map(p => { const on = perms[p.key] === true; return `<span class="perm-tag ${on?'on':''}">${on?'✓':'✕'} ${escapeHtml(p.label)}</span>`; }).join('');
+    const classes = ['user-card']; classes.push(u.perfil === 'admin' ? 'admin' : 'view'); if(!ativo) classes.push('inativo');
+    const badges = [`<span class="user-badge ${u.perfil}">${u.perfil === 'admin' ? 'ADMIN' : 'VISUALIZAÇÃO'}</span>`,`<span class="user-badge ${ativo?'ativo':'inativo'}">${ativo ? 'ATIVO' : 'INATIVO'}</span>`];
+    if(u.primeiroAcesso) badges.push(`<span class="user-badge primeiro">1º ACESSO PENDENTE</span>`);
+    if(u.usuario === ROOT_LOGIN) badges.push(`<span class="user-badge admin">ROOT</span>`);
+    const acoes = [];
+    if(podeEditar) acoes.push(`<button class="btn ghost" data-action="editar" data-user="${escapeAttr(u.usuario)}">Editar</button>`);
+    if(podeEditar) acoes.push(`<button class="btn ghost" data-action="toggleAtivo" data-user="${escapeAttr(u.usuario)}" data-ativo="${ativo?'sim':'nao'}">${ativo ? 'Desativar' : 'Ativar'}</button>`);
+    if(podeResetar) acoes.push(`<button class="btn ghost danger" data-action="resetar" data-user="${escapeAttr(u.usuario)}">Resetar senha</button>`);
+    return `<div class="${classes.join(' ')}" data-user="${escapeAttr(u.usuario)}"><div class="user-card-head"><div><div class="user-card-name">${escapeHtml(u.nome || u.usuario)}</div><div class="user-card-login">@${escapeHtml(u.usuario)}</div></div><div class="user-badges">${badges.join('')}</div></div><div class="user-perms">${permsHtml}</div><div class="user-meta">Criado em: ${escapeHtml(u.criadoEm || '—')}</div>${u.usuario === ROOT_LOGIN || acoes.length === 0 ? '' : `<div class="user-actions">${acoes.join('')}</div>`}</div>`;
+  }).join('');
+  document.querySelectorAll('#view-usuarios [data-action="editar"]').forEach(b => { b.addEventListener('click', () => { const u = USUARIOS_CACHE.find(x => x.usuario === b.dataset.user); if(u) abrirUserModal('edit', u); }); });
+  document.querySelectorAll('#view-usuarios [data-action="toggleAtivo"]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const user = b.dataset.user; const ativoAtual = b.dataset.ativo === 'sim'; const novoAtivo = ativoAtual ? 'nao' : 'sim';
+      if(!confirm(`Confirma ${ativoAtual?'desativar':'ativar'} o usuário "${user}"?`)) return;
+      const r = await apiOS('atualizarUsuario', { usuarioAlvo:user, ativo:novoAtivo });
+      if(!r.ok){ alert('Erro: ' + r.error); return; } await carregarUsuarios();
+    });
+  });
+  document.querySelectorAll('#view-usuarios [data-action="resetar"]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const user = b.dataset.user; if(!confirm(`Resetar a senha de "${user}" para a padrão?`)) return;
+      const r = await apiOS('resetarSenha', { usuarioAlvo:user });
+      if(!r.ok){ alert('Erro: ' + r.error); return; } alert('Senha resetada.'); await carregarUsuarios();
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// POLLING + VISIBILITY
+// ═══════════════════════════════════════════════════════════════════════════
+let _pollHandle = null;
+function iniciarPolling(){
+  if(_pollHandle) clearInterval(_pollHandle);
+  _pollHandle = setInterval(async () => {
+    if(document.hidden) return;
+    const modalOpen = ['editModal','reportModal','manutReportModal','prevReportModal','actionModal','userModal','changePassModal','sucessoModal','multiProcessosModal','forcarConversaoModal'].some(id => { const el = $(id); return el && el.style.display === 'flex'; });
+    const selFocused = document.activeElement && ['SELECT','INPUT','TEXTAREA'].includes(document.activeElement.tagName);
+    if(modalOpen || selFocused) return;
+    if(activeView === 'os' && temPermissao('ver_os')) await loadDataOS();
+    if(activeView === 'viaturas' && temPermissao('ver_viaturas')) await loadDataViaturas();
+    if(activeView === 'manutencao' && temPermissao('ver_manutencao')) await loadDataManut();
+    if(activeView === 'preventiva' && temPermissao('ver_preventiva') && PREV_TAB_ATUAL === 'painel') await loadDataPreventiva();
+  }, POLLING_INTERVAL);
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) return;
+  if(activeView === 'os' && temPermissao('ver_os')) loadDataOS();
+  if(activeView === 'viaturas' && temPermissao('ver_viaturas')) loadDataViaturas();
+  if(activeView === 'manutencao' && temPermissao('ver_manutencao')) loadDataManut();
+  if(activeView === 'preventiva' && temPermissao('ver_preventiva')) loadDataPreventiva();
+});
+if(IS_IOS){
+  document.addEventListener('focusin', e => {
+    if(e.target.matches('input, select, textarea')){
+      setTimeout(() => {
+        try{ e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }); }catch(err){}
+      }, 350);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LISTENERS
+// ═══════════════════════════════════════════════════════════════════════════
+$('menuToggle').addEventListener('click', () => {
+  const app = $('app');
+  if(isMobile()){ app.classList.toggle('sidebar-open'); }
+  else { app.classList.toggle('sidebar-collapsed'); try{ localStorage.setItem('deman_sidebar_collapsed', app.classList.contains('sidebar-collapsed') ? '1' : '0'); }catch(e){} }
+});
+$('sidebarBackdrop').addEventListener('click', () => $('app').classList.remove('sidebar-open'));
+document.querySelectorAll('.sidebar-link[data-view]').forEach(btn => {
+  if(btn.id === 'sidebarMovParent') return;
+  if(btn.id === 'sidebarPrevParent') return;
+  btn.addEventListener('click', () => showView(btn.dataset.view));
+});
+$('sidebarPrevParent').addEventListener('click', () => {
+  if(activeView !== 'preventiva'){ showView('preventiva'); setSidebarPrevExpanded(true); }
+  else { var sub = $('sidebarSubPrev'); setSidebarPrevExpanded(!(sub && sub.classList.contains('open'))); }
+});
+document.querySelectorAll('#sidebarSubPrev .sidebar-sublink').forEach(btn => {
+  btn.addEventListener('click', (e) => { e.stopPropagation(); showView('preventiva'); showPrevTab(btn.dataset.prevTab); });
+});
+$('sidebarMovParent').addEventListener('click', () => { if(activeView !== 'manutencao'){ showView('manutencao'); setSidebarMovExpanded(true); } else { setSidebarMovExpanded(!sidebarMovExpanded); } });
+document.querySelectorAll('#sidebarSubMov .sidebar-sublink').forEach(btn => { btn.addEventListener('click', (e) => { e.stopPropagation(); showView('manutencao'); if(btn.dataset.manutTab === 'novo'){ limparFormManut(); } showManutTab(btn.dataset.manutTab); }); });
+$('logoutBtn').addEventListener('click', handleLogout);
+$('loginBtn').addEventListener('click', handleLogin);
+$('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') handleLogin(); });
+$('loginUser').addEventListener('keydown', e => { if(e.key==='Enter') $('loginPass').focus(); });
+$('cp-save').addEventListener('click', salvarNovaSenha);
+$('cp-confirm').addEventListener('keydown', e => { if(e.key==='Enter') salvarNovaSenha(); });
+$('um-cancel').addEventListener('click', fecharUserModal);
+$('um-save').addEventListener('click', salvarUserModal);
+$('um-reset').addEventListener('click', resetarSenhaUsuario);
+$('um-perfil').addEventListener('change', () => aplicarDefaultsPorPerfil($('um-perfil').value));
+$('userModal').addEventListener('click', e => { if(e.target.id === 'userModal') fecharUserModal(); });
+$('newUserBtn').addEventListener('click', () => { if(!temPermissao('usuarios_criar')){ alert('Sem permissão.'); return; } abrirUserModal('create'); });
+$('usersSearch').addEventListener('input', debounce(renderUsuarios, 180));
+$('usersClearFilterBtn').addEventListener('click', () => {
+  $('usersSearch').value = '';
+  renderUsuarios();
+});
+
+const afStageSel = $('af-stage'); afStageSel.innerHTML = STAGES.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
+$('osSearch').addEventListener('input', debounce(() => renderOS(), 180));
+$('clearFilterBtn').addEventListener('click', () => { 
+  activeStatusFilter = null; 
+  $('osSearch').value = '';
+  renderOS(); 
+});
+$('addBtn').addEventListener('click', () => { if(!temPermissao('os_criar')){ alert('Sem permissão.'); return; } $('addForm').classList.toggle('open'); });
+$('af-cancel').addEventListener('click', () => $('addForm').classList.remove('open'));
+$('af-save').addEventListener('click', async () => {
+  if(!temPermissao('os_criar')){ alert('Sem permissão.'); return; }
+  const v = normalizeViatura($('af-v').value); const os = $('af-os').value.trim();
+  const catLabel = $('af-cat').value.trim() || 'Outras'; const empresa = $('af-empresa').value.trim();
+  const stage = $('af-stage').value; const orcada = $('af-orcada').value; const qntRaw = $('af-qnt').value.trim(); const note = $('af-note').value.trim();
+  if(!v || !os){ alert('Preencha a viatura e o número da OS.'); return; }
+  let orcamentos = 0;
+  if(orcada === 'Sim'){ orcamentos = parseInt(qntRaw,10); if(isNaN(orcamentos) || orcamentos < 1) orcamentos = 1; if(orcamentos > 5) orcamentos = 5; }
+  const distribuida = (orcada === 'Sim') ? $('af-distribuida').value : '';
+  let qtdDist = '';
+  if(distribuida === 'Sim'){ const qd = parseInt($('af-qtd-dist').value.trim(), 10); if(!isNaN(qd) && qd > 0) qtdDist = String(qd); }
+  if(OS_DATA.some(r => String(r.os).trim().toLowerCase() === os.toLowerCase())){ alert(`Já existe uma OS com o número ${os}.`); return; }
+  const newRecord = { id:'r'+Date.now(), v, os, category:catLabel, catKey:slugify(catLabel), stage, orcamentos, distribuida, qtdDist, tabela:false, justificativa:false, empresa, note, alteradoPor:'', ultimaAlt:'' };
+  OS_DATA.push(newRecord); renderOS();
+  const ok = await createOSInSheet({ categoria:catLabel, viatura:v, os, status:stage, orcada, qnt:orcamentos>0?String(orcamentos):'', distribuida, qtdDist, oficina:empresa, observacoes:note });
+  if(!ok){ const idx = OS_DATA.indexOf(newRecord); if(idx > -1) OS_DATA.splice(idx,1); alert('A OS não pôde ser adicionada.'); }
+  else { ['af-v','af-os','af-cat','af-note','af-empresa','af-qnt','af-qtd-dist'].forEach(id => $(id).value = ''); $('af-orcada').value = 'Não'; $('af-distribuida').value = ''; $('addForm').classList.remove('open'); atualizarCascataOrcada('af'); }
+  renderOS();
+});
+$('csvFileInput').addEventListener('change', e => {
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { processCsvText(ev.target.result); $('errorArea').style.display='none'; renderOS(); };
+  reader.readAsText(file);
+});
+$('ed-cancel').addEventListener('click', closeEditModal);
+$('editModal').addEventListener('click', e => { if(e.target.id === 'editModal') closeEditModal(); });
+$('ed-save').addEventListener('click', async () => {
+  if(!temPermissao('os_editar')){ alert('Sem permissão.'); return; }
+  const rec = OS_DATA.find(r => r.id === editingRecordId); if(!rec){ closeEditModal(); return; }
+  const newV = normalizeViatura($('ed-v').value); const newOs = $('ed-os').value.trim();
+  const newCat = $('ed-cat').value.trim() || 'Outras'; const newEmpresa = $('ed-empresa').value.trim();
+  const newStage = $('ed-stage').value; const newOrcada = $('ed-orcada').value;
+  const newQntRaw = $('ed-qnt').value.trim(); const newNote = $('ed-note').value.trim();
+  if(!newV || !newOs){ alert('Preencha a viatura e o número da OS.'); return; }
+  let newOrcamentos = 0;
+  if(newOrcada === 'Sim'){ newOrcamentos = parseInt(newQntRaw, 10); if(isNaN(newOrcamentos) || newOrcamentos < 1) newOrcamentos = 1; if(newOrcamentos > 5) newOrcamentos = 5; }
+  const newDistribuida = (newOrcada === 'Sim') ? ($('ed-distribuida').value || '') : '';
+  let newQtdDist = '';
+  if(newDistribuida === 'Sim'){ const qd = parseInt($('ed-qtd-dist').value.trim(), 10); if(!isNaN(qd) && qd > 0) newQtdDist = String(qd); }
+  const backup = { v:rec.v, os:rec.os, category:rec.category, catKey:rec.catKey, empresa:rec.empresa, stage:rec.stage, orcamentos:rec.orcamentos, distribuida:rec.distribuida, qtdDist:rec.qtdDist, note:rec.note };
+  const originalOs = rec.os; const originalViatura = rec.v;
+  rec.v = newV; rec.os = newOs; rec.category = newCat; rec.catKey = slugify(newCat);
+  rec.empresa = newEmpresa; rec.stage = newStage; rec.orcamentos = newOrcamentos; rec.note = newNote;
+  rec.distribuida = newDistribuida; rec.qtdDist = newQtdDist;
+  closeEditModal(); renderOS();
+  const ok = await editOSInSheet(originalOs, originalViatura, { viatura:newV, os:newOs, categoria:newCat, oficina:newEmpresa, status:newStage, orcada:newOrcada, qnt:newOrcamentos>0?String(newOrcamentos):'', distribuida:newDistribuida, qtdDist:newQtdDist, observacoes:newNote });
+  if(!ok){ Object.assign(rec, backup); alert('A edição não pôde ser salva. Revertida.'); renderOS(); }
+});
+$('reportBtn').addEventListener('click', () => { if(!temPermissao('os_relatorio')){ alert('Sem permissão.'); return; } abrirRelatorioOS(); });
+$('reportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioOS()));
+$('reportClose').addEventListener('click', () => _fecharReportModal('reportModal'));
+$('reportModal').addEventListener('click', e => { if(e.target.id === 'reportModal') _fecharReportModal('reportModal'); });
+
+$('viatSearch').addEventListener('input', debounce(() => renderViaturas(), 180));
+$('viatClearFilterBtn').addEventListener('click', () => { 
+  activeFilter = 'todas'; 
+  $('viatSearch').value = '';
+  renderViaturas(); 
+});
+$('prevSearch').addEventListener('input', debounce(renderPreventiva, 180));
+$('prevFiltroSituacao').addEventListener('change', e => { PREV_FILTRO_SITUACAO = e.target.value; renderPreventiva(); });
+$('prevFiltroOleo').addEventListener('change', e => { PREV_FILTRO_OLEO = e.target.value; renderPreventiva(); });
+$('prevClearFilterBtn').addEventListener('click', () => {
+  PREV_FILTRO_SITUACAO = ''; PREV_FILTRO_OLEO = '';
+  $('prevFiltroSituacao').value = ''; $('prevFiltroOleo').value = ''; $('prevSearch').value = '';
+  renderPreventiva();
+});
+$('prevReportBtn').addEventListener('click', () => { if(!temPermissao('ver_preventiva')){ alert('Sem permissão.'); return; } abrirRelatorioPreventiva(); });
+$('prevReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioPreventiva()));
+$('prevReportClose').addEventListener('click', () => _fecharReportModal('prevReportModal'));
+$('prevReportModal').addEventListener('click', e => { if(e.target.id === 'prevReportModal') _fecharReportModal('prevReportModal'); });
+
+$('multiProcessosClose').addEventListener('click', () => $('multiProcessosModal').style.display = 'none');
+$('multiProcessosModal').addEventListener('click', e => { if(e.target.id === 'multiProcessosModal') $('multiProcessosModal').style.display = 'none'; });
+
+$('forcarConversaoCancelar').addEventListener('click', () => { $('forcarConversaoModal').style.display = 'none'; _conversaoPendenteId = null; });
+$('forcarConversaoModal').addEventListener('click', e => { if(e.target.id === 'forcarConversaoModal'){ $('forcarConversaoModal').style.display = 'none'; _conversaoPendenteId = null; } });
+$('forcarConversaoCriarParalelo').addEventListener('click', async () => {
+  if(!_conversaoPendenteId) return;
+  const btn = $('forcarConversaoCriarParalelo');
+  btn.disabled = true; btn.textContent = 'Convertendo…';
+  const r = await apiManut('forcarConversaoAgendamento', { idAgendamento: _conversaoPendenteId, paralelo: true });
+  btn.disabled = false; btn.textContent = 'Criar em paralelo mesmo assim';
+  if(!r.ok){ $('forcarConversaoErro').textContent = r.error || 'Erro'; $('forcarConversaoErro').style.display = 'block'; return; }
+  const idAntigo = _conversaoPendenteId;
+  $('forcarConversaoModal').style.display = 'none';
+  _conversaoPendenteId = null;
+  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+  await loadDataManut();
+  mostrarSucesso({
+    titulo: 'Agendamento convertido!',
+    sub: 'Novo processo: ' + r.idNovo + ' (paralelo)',
+    resumo: [['ID agendamento', idAntigo], ['Novo processo Viatura', r.idNovo]],
+    mensagemWhats: ''
+  });
+});
+
+$('pf-busca').addEventListener('input', debounce(_handlePfBuscaInput, 120));
+$('pf-busca').addEventListener('focus', () => { if($('pf-busca').value.trim()) renderDropdownViaturas(); });
+$('pf-km').addEventListener('input', atualizarDicaKm);
+$('pf-cancel').addEventListener('click', () => { limparFormularioPreventiva(); showPrevTab('painel'); });
+$('pf-save').addEventListener('click', salvarPreventivaForm);
+document.addEventListener('click', e => {
+  const wrap = $('pf-busca-wrap'); if(!wrap) return;
+  if(!wrap.contains(e.target)) fecharDropdownViaturas();
+});
+
+$('pneus-busca').addEventListener('input', debounce(_handlePneusBuscaInput, 120));
+$('pneus-busca').addEventListener('focus', () => { if($('pneus-busca').value.trim()) renderDropdownPneus(); });
+$('pneus-cancel').addEventListener('click', () => {
+  _viaturaSelecionadaPneu = null;
+  $('pneus-busca').value = ''; $('pneus-info').style.display = 'none';
+  $('pneus-busca-dica').textContent = 'Selecione uma viatura para continuar.';
+  showPrevTab('painel');
+});
+$('pneus-save').addEventListener('click', salvarPneusForm);
+document.addEventListener('click', e => {
+  const wrap = $('pneus-busca-wrap'); if(!wrap) return;
+  if(!wrap.contains(e.target)) $('pneus-dropdown').classList.remove('open');
+});
+
+$('manutSearch').addEventListener('input', debounce(renderManut, 180));
+$('manutClearFilterBtn').addEventListener('click', () => { MANUT_FILTRO_STATUS = 'abertos'; MANUT_FILTRO_TIPO = ''; $('manutFiltroTipo').value = ''; $('manutSearch').value = ''; renderManut(); });
+$('manutFiltroTipo').addEventListener('change', e => { MANUT_FILTRO_TIPO = e.target.value; renderManut(); });
+$('mm-tipo').addEventListener('change', atualizarFormPorTipo);
+$('mm-save').addEventListener('click', salvarManut);
+$('mm-cancel').addEventListener('click', cancelarFormManut);
+$('mm-status').addEventListener('change', () => trocarCampoLocal('mm-local-wrap','mm-status',false));
+$('me-status').addEventListener('change', () => trocarCampoLocal('me-local-wrap','me-status',true, processoAtual ? processoAtual.tipo : undefined));
+$('mf-status').addEventListener('change', () => montarCampoLocalFinal());
+$('manutReportBtn').addEventListener('click', () => { if(!temPermissao('ver_manutencao')){ alert('Sem permissão.'); return; } abrirRelatorioManut(); });
+$('manutReportPrint').addEventListener('click', () => imprimirComTitulo(_nomeRelatorioManut()));
+$('manutReportClose').addEventListener('click', () => _fecharReportModal('manutReportModal'));
+$('manutReportModal').addEventListener('click', e => { if(e.target.id === 'manutReportModal') _fecharReportModal('manutReportModal'); });
+const selStatusManutRep = $('manutReportStatus');
+if(selStatusManutRep){ selStatusManutRep.addEventListener('change', () => { manutRepStatusFiltro = selStatusManutRep.value; renderRelatorioManut(); }); }
+const selModeManutRep = $('manutReportMode');
+if(selModeManutRep){ selModeManutRep.addEventListener('change', () => renderRelatorioManut()); }
+const selMesManutRep = $('manutReportMonth');
+if(selMesManutRep){ selMesManutRep.addEventListener('change', () => renderRelatorioManut()); }
+$('sucessoVoltar').addEventListener('click', fecharSucesso);
+$('sucessoWhats').addEventListener('click', () => { if(_sucessoMensagemWhats) abrirWhatsApp(_sucessoMensagemWhats); });
+$('sucessoModal').addEventListener('click', e => { if(e.target.id === 'sucessoModal') fecharSucesso(); });
+
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  if($('pf-dropdown') && $('pf-dropdown').classList.contains('open')){ fecharDropdownViaturas(); return; }
+  ['editModal','reportModal','manutReportModal','prevReportModal','actionModal','userModal','multiProcessosModal','forcarConversaoModal'].forEach(id => {
+    const el = $(id);
+    if(!el || el.style.display !== 'flex') return;
+    if(id === 'reportModal' || id === 'manutReportModal' || id === 'prevReportModal') _fecharReportModal(id);
+    else if(id === 'forcarConversaoModal'){ el.style.display = 'none'; _conversaoPendenteId = null; }
+    else el.style.display = 'none';
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// START APP
+// ═══════════════════════════════════════════════════════════════════════════
+function startApp(){
+  hideLogin(); $('app').classList.add('is-ready'); syncInternetTime();
+  currentUser = sessionStorage.getItem('deman_user_nome') || '';
+  currentPerfil = sessionStorage.getItem('deman_user_perfil') || 'view';
+  currentLogin = sessionStorage.getItem('deman_user_login') || '';
+  try{ currentPermissoes = JSON.parse(sessionStorage.getItem('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
+  $('currentUserName').textContent = currentUser || '—';
+  const perfilEl = $('currentUserPerfil');
+  if(perfilEl){ perfilEl.textContent = isAdmin() ? 'ADMIN' : 'VISUALIZAÇÃO'; perfilEl.className = 'badge-perfil ' + (isAdmin() ? 'admin' : 'view'); perfilEl.style.display = 'inline-block'; }
+  try{ if(localStorage.getItem('deman_sidebar_collapsed') === '1' && !isMobile()) $('app').classList.add('sidebar-collapsed'); }catch(e){}
+  renderPermissoesNoModal(); aplicarPermissoesUI();
+  limparFormManut();
+  if(carregarCache() && temPermissao('ver_viaturas')){ renderViaturas(); }
+  if(temPermissao('ver_os')) loadDataOS();
+  if(temPermissao('ver_viaturas')) loadDataViaturas();
+  if(temPermissao('ver_manutencao')) loadDataManut();
+  if(temPermissao('ver_preventiva')){
+    loadDataPreventiva();
+    if(temPermissao('prev_editar_km')) loadListaCompletaPreventiva();
+  }
+  showView('home');
+  iniciarPolling();
+}
+
+function setFormModo(modo){
+  modoManutForm = modo;
+  $('formCriar').style.display = (modo === 'criar') ? '' : 'none';
+  $('formEvento').style.display = (modo === 'evento') ? '' : 'none';
+  $('formFinalizar').style.display = (modo === 'finalizar') ? '' : 'none';
+  if(modo === 'criar'){
+    $('manutFormTitle').textContent = '🛠 Nova entrada';
+    $('manutFormHelp').innerHTML = 'Escolha o tipo (Viatura, Outro ou Agendamento) e preencha os dados.';
+    $('procInfoBox').style.display = 'none';
+    $('mm-delete').style.display = 'none';
+    $('mm-save').textContent = 'Criar processo';
+  } else if(modo === 'evento'){
+    $('manutFormTitle').textContent = '📝 Adicionar evento';
+    $('manutFormHelp').innerHTML = 'Adicione uma movimentação ou observação a este processo.';
+    $('mm-delete').style.display = 'none';
+    $('mm-save').textContent = 'Salvar evento';
+  } else if(modo === 'finalizar'){
+    $('manutFormTitle').textContent = '✅ Finalizar processo';
+    $('manutFormHelp').innerHTML = 'Ao finalizar, o processo é encerrado.';
+    $('mm-delete').style.display = 'none';
+    $('mm-save').textContent = 'Finalizar';
+  }
+}
+
+function atualizarFormPorTipo(){
+  const tipo = $('mm-tipo').value;
+  const lblV = $('mm-viatura-label');
+  const inpV = $('mm-viatura');
+  const wrapLocal = $('mm-local-wrap');
+  const lblStatus = $('mm-status-label');
+  const lblEntrada = $('mm-entrada-label');
+  const lblDataAg = $('mm-data-ag-label');
+  const lblHoraAg = $('mm-hora-ag-label');
+
+  if(!tipo){
+    if(lblV) lblV.childNodes[0].nodeValue = 'Viatura';
+    if(inpV) inpV.placeholder = 'ex: ABT-17';
+    if(lblStatus) lblStatus.style.display = '';
+    if(lblEntrada) lblEntrada.style.display = '';
+    if(lblDataAg) lblDataAg.style.display = 'none';
+    if(lblHoraAg) lblHoraAg.style.display = 'none';
+    return;
+  }
+
+  if(tipo === TIPO_AGENDAMENTO){
+    if(lblV) lblV.childNodes[0].nodeValue = 'Viatura';
+    if(inpV) inpV.placeholder = 'ex: ABT-17';
+    if(lblStatus) lblStatus.style.display = 'none';
+    if(lblEntrada) lblEntrada.style.display = 'none';
+    if(lblDataAg) lblDataAg.style.display = '';
+    if(lblHoraAg) lblHoraAg.style.display = '';
+    wrapLocal.innerHTML = _htmlInputLocal('mm-local', lerLocalForm('mm-local-wrap'));
+    const dt = new Date(); dt.setDate(dt.getDate() + 7);
+    const pad = n => String(n).padStart(2,'0');
+    $('mm-data-ag').value = dt.getFullYear() + '-' + pad(dt.getMonth()+1) + '-' + pad(dt.getDate());
+    if(!$('mm-hora-ag').value) $('mm-hora-ag').value = '08:00';
+    return;
+  }
+
+  if(lblDataAg) lblDataAg.style.display = 'none';
+  if(lblHoraAg) lblHoraAg.style.display = 'none';
+  if(lblStatus) lblStatus.style.display = '';
+  if(lblEntrada) lblEntrada.style.display = '';
+
+  if(tipo === TIPO_OUTRO){
+    if(lblV) lblV.childNodes[0].nodeValue = 'Descrição do item';
+    if(inpV) inpV.placeholder = 'ex: Cilindro de ar, Bomba, Peça X…';
+    montarCampoLocal('mm-local-wrap', lerLocalForm('mm-local-wrap'), $('mm-status').value, false, TIPO_OUTRO);
+  } else {
+    if(lblV) lblV.childNodes[0].nodeValue = 'Viatura';
+    if(inpV) inpV.placeholder = 'ex: ABT-17';
+    montarCampoLocal('mm-local-wrap', lerLocalForm('mm-local-wrap'), $('mm-status').value, false);
+  }
+}
+
+async function salvarCriarManut(){
+  const err = $('mm-error'); const btn = $('mm-save'); err.style.display = 'none'; err.textContent = '';
+  const tipo       = $('mm-tipo').value;
+  const viatura    = $('mm-viatura').value.trim().toUpperCase();
+  const local      = lerLocalForm('mm-local-wrap');
+  const solicitante= $('mm-solicitante').value.trim();
+  const informante = $('mm-informante').value.trim();
+  const detalhes   = $('mm-detalhes').value.trim();
+
+  if(!tipo){ err.textContent = 'Selecione o tipo.'; err.style.display='block'; return; }
+  if(!viatura){ err.textContent = tipo === TIPO_OUTRO ? 'Informe a descrição.' : 'Informe a viatura.'; err.style.display='block'; return; }
+  if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
+
+  let payload = { tipo, viatura, local, solicitante, informante, detalhes };
+
+  if(tipo === TIPO_AGENDAMENTO){
+    const dataAg = $('mm-data-ag').value;
+    const horaAg = $('mm-hora-ag').value || '08:00';
+    if(!dataAg){ err.textContent = 'Informe a data agendada.'; err.style.display='block'; return; }
+    payload.dataAgendada = dataAg;
+    payload.horaAgendada = horaAg;
+  } else {
+    const status  = $('mm-status').value;
+    const entrada = $('mm-entrada').value;
+    if(!entrada){ err.textContent = 'Informe a data de entrada.'; err.style.display='block'; return; }
+    payload.status = status;
+    payload.entrada = entrada;
+  }
+
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  let r;
+  try {
+    r = await apiManut('criarProcesso', payload);
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Criar processo';
+  }
+  if(!r || !r.ok){
+    err.textContent = (r && r.error) || 'Erro ao salvar.';
+    err.style.display = 'block';
+    return;
+  }
+
+  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+  await loadDataManut();
+
+  const grupos = agruparPorProcesso();
+  const procCriado = grupos[r.id];
+
+  if(tipo === TIPO_AGENDAMENTO){
+    const dtAg = parseDataManut(payload.dataAgendada + ' ' + payload.horaAgendada);
+    const dtAgStr = dtAg ? dtAg.toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : (payload.dataAgendada + ' ' + payload.horaAgendada);
+    mostrarSucesso({
+      titulo: 'Agendamento criado!',
+      sub: 'ID: ' + r.id + ' · ' + dtAgStr,
+      resumo: [
+        ['Tipo', TIPO_AGENDAMENTO],
+        ['ID', r.id],
+        ['Viatura', viatura],
+        ['Data/hora agendada', dtAgStr],
+        ['Local', local || '—'],
+        ['Informante', informante]
+      ],
+      mensagemWhats: ''
+    });
+  } else {
+    const status = payload.status;
+    const resumo = [
+      ['Tipo', tipo], ['ID', r.id],
+      [tipo === TIPO_OUTRO ? 'Item' : 'Viatura', viatura],
+      ['Status', statusLabelManut(status)],
+      ['Local', local || '—'],
+      ['Entrada', payload.entrada]
+    ];
+    if(payload.processosAbertosAntes) resumo.push(['Paralelos', payload.processosAbertosAntes + ' processo(s) já aberto(s)']);
+    if(solicitante) resumo.push(['Solicitante', solicitante]);
+    resumo.push(['Informante', informante]);
+    const mensagem = procCriado ? montarMensagemEntrada(procCriado) : '';
+    mostrarSucesso({ titulo: 'Processo criado!', sub: 'ID: ' + r.id, resumo: resumo, mensagemWhats: mensagem });
+  }
+  limparFormManut();
+}
+
+function abrirFormEvento(p){
+  if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
+  processoAtual = p;
+  setFormModo('evento');
+  preencherProcInfoBox(p);
+  const tipoProc = p.tipo || TIPO_VIATURA;
+  if(tipoProc === TIPO_AGENDAMENTO){
+    $('me-tipo').value = 'Observação';
+    $('me-tipo').querySelector('option[value="Movimentação"]').disabled = true;
+  } else {
+    $('me-tipo').value = 'Movimentação';
+    $('me-tipo').querySelector('option[value="Movimentação"]').disabled = false;
+  }
+  $('me-data').value = agoraDatetimeLocal();
+  $('me-status').value = '';
+  montarCampoLocal('me-local-wrap', p.ultimo ? p.ultimo.local : '', $('me-status').value, true, tipoProc);
+  $('me-solicitante').value = p.solicitante || (p.entrada ? p.entrada.solicitante : '');
+  $('me-informante').value = '';
+  $('me-detalhes').value = '';
+  $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
+  showView('manutencao'); showManutTab('novo');
+}
+
+function limparFormManut(){
+  processoAtual = null;
+  setFormModo('criar');
+  $('mm-tipo').value = '';
+  $('mm-tipo').disabled = false;
+  $('mm-viatura').value = ''; $('mm-viatura').disabled = false;
+  $('mm-status').value = 'Em Manutenção'; $('mm-status').disabled = false;
+  $('mm-entrada').value = agoraDatetimeLocal(); $('mm-entrada').disabled = false;
+  $('mm-data-ag').value = ''; $('mm-hora-ag').value = '08:00';
+  montarCampoLocal('mm-local-wrap', '', $('mm-status').value, false);
+  atualizarFormPorTipo();
+  $('mm-solicitante').value = ''; $('mm-solicitante').disabled = false;
+  $('mm-informante').value = ''; $('mm-informante').disabled = false;
+  $('mm-detalhes').value = ''; $('mm-detalhes').disabled = false;
+
+  $('me-tipo').value = 'Movimentação';
+  $('me-data').value = agoraDatetimeLocal();
+  $('me-status').value = '';
+  montarCampoLocal('me-local-wrap', '', '', true);
+  $('me-solicitante').value = '';
+  $('me-informante').value = '';
+  $('me-detalhes').value = '';
+
+  $('mf-data').value = agoraDatetimeLocal();
+  $('mf-status').value = 'Ativa';
+  $('mf-local-wrap').innerHTML = '';
+  montarCampoLocalFinal();
+  $('mf-informante').value = '';
+  $('mf-detalhes').value = '';
+
+  $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
+  $('procInfoBox').style.display = 'none';
+}
+
+function preencherProcInfoBox(p){
+  const inf = p.entrada ? p.entrada.informante : '';
+  const det = p.entrada ? p.entrada.detalhes : '';
+  const tipo = p.tipo || TIPO_VIATURA;
+  const labelItem = tipo === TIPO_OUTRO ? 'Item' : 'Viatura';
+  const solicitante = p.solicitante || (p.entrada ? p.entrada.solicitante : '');
+  $('procInfoBox').innerHTML = `
+    <div class="row"><span>Tipo</span><b>${escapeHtml(tipo)}</b></div>
+    <div class="row"><span>Processo</span><b>${escapeHtml(p.id)}</b></div>
+    <div class="row"><span>${labelItem}</span><b>${escapeHtml(p.viatura)}</b></div>
+    <div class="row"><span>Entrada</span><b>${escapeHtml(p.entrada ? p.entrada.data : '—')}</b></div>
+    <div class="row"><span>Local</span><b>${escapeHtml(p.entrada ? p.entrada.local : '—')}</b></div>
+    ${solicitante ? `<div class="row"><span>Solicitante</span><b>${escapeHtml(solicitante)}</b></div>` : ''}
+    <div class="row"><span>Informante</span><b>${escapeHtml(inf || '—')}</b></div>
+    ${det ? `<div class="row"><span>Detalhes</span><b style="text-align:right;max-width:65%;">${escapeHtml(det)}</b></div>` : ''}
+  `;
+  $('procInfoBox').style.display = '';
+}
+
+function agoraDatetimeLocal(){
+  const agora = new Date(); const pad = n => String(n).padStart(2,'0');
+  return `${agora.getFullYear()}-${pad(agora.getMonth()+1)}-${pad(agora.getDate())}T${pad(agora.getHours())}:${pad(agora.getMinutes())}`;
+}
+
+function showManutTab(name){
+  if(name !== 'registros' && name !== 'novo') return;
+  if(name === 'novo' && !temPermissao('manut_criar')) name = 'registros';
+  activeManutTab = name;
+  document.querySelectorAll('#sidebarSubMov .sidebar-sublink').forEach(b => b.classList.toggle('active', b.dataset.manutTab === name));
+  $('manutPanel-registros').classList.toggle('active', name === 'registros');
+  $('manutPanel-novo').classList.toggle('active', name === 'novo');
+  setSidebarMovExpanded(true);
+  window.scrollTo(0, 0);
+  if(name === 'novo' && modoManutForm === 'criar') setTimeout(() => $('mm-tipo').focus({ preventScroll: true }), 60);
+}
+
+async function salvarManut(){
+  if(modoManutForm === 'criar') return salvarCriarManut();
+  if(modoManutForm === 'evento') return salvarEventoManut();
+  if(modoManutForm === 'finalizar') return salvarFinalizarManut();
+}
+
+async function salvarEventoManut(){
+  if(!processoAtual) return;
+  const err = $('mm-error'); const btn = $('mm-save'); err.style.display = 'none'; err.textContent = '';
+  const tipo       = $('me-tipo').value;
+  const data       = $('me-data').value;
+  const status     = $('me-status').value;
+  const local      = lerLocalForm('me-local-wrap');
+  const solicitante= $('me-solicitante').value.trim();
+  const informante = $('me-informante').value.trim();
+  const detalhes   = $('me-detalhes').value.trim();
+  if(!data){ err.textContent = 'Informe a data.'; err.style.display='block'; return; }
+  if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  const procId = processoAtual.id;
+  let r;
+  try {
+    r = await apiManut('adicionarEvento', { 
+      id: procId, 
+      evento: tipo, 
+      tipo: tipo, 
+      tipoEvento: tipo, 
+      data: data, 
+      dataEvento: data, 
+      status, 
+      local, 
+      solicitante, 
+      informante, 
+      detalhes 
+    });
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar evento';
+  }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
+  _ultimoEventoAdicionado[procId] = Date.now();
+  _persistirDesfazer();
+  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+  await loadDataManut();
+  limparFormManut();
+  showManutTab('registros');
+  window.scrollTo(0, 0);
+}
+
+async function salvarFinalizarManut(){
+  if(!processoAtual) return;
+  const err = $('mm-error'); const btn = $('mm-save'); err.style.display = 'none'; err.textContent = '';
+  const dataFim     = $('mf-data').value;
+  const statusFinal = $('mf-status').value;
+  const local       = lerLocalForm('mf-local-wrap');
+  const informante  = $('mf-informante').value.trim();
+  const detalhes    = $('mf-detalhes').value.trim();
+  if(!dataFim){ err.textContent = 'Informe a data final.'; err.style.display='block'; return; }
+  if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
+  if(!detalhes){ if(!confirm('Sem descrição do que foi feito. Continuar mesmo assim?')) return; }
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  const procId = processoAtual.id;
+  let r;
+  try {
+    r = await apiManut('finalizarProcesso', { id: procId, statusFinal, dataFim, local, informante, detalhes });
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Finalizar';
+  }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao finalizar.'; err.style.display = 'block'; return; }
+  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+  await loadDataManut();
+  const grupos = agruparPorProcesso();
+  const procAtualizado = grupos[procId];
+  const mensagem = procAtualizado ? montarMensagemFinalizacao(procAtualizado) : '';
+  const dataFimBR = dataFim.split('T')[0].split('-').reverse().join('/');
+  const dias = r.dias != null ? r.dias : 0;
+  const localFinal = r.localUsado || local || '—';
+  const outrosAbertos = Array.isArray(r.outrosAbertos) ? r.outrosAbertos : [];
+  const resumo = [
+    ['Tipo', processoAtual.tipo || TIPO_VIATURA],
+    ['ID', procId],
+    [(processoAtual.tipo === TIPO_OUTRO) ? 'Item' : 'Viatura', processoAtual.viatura],
+    ['Status final', statusLabelManut(statusFinal)],
+    ['Local', localFinal],
+    ['Saída', dataFimBR],
+    ['Dias', dias + 'd'],
+    ['Informante', informante]
+  ];
+  if(outrosAbertos.length > 0){
+    resumo.push(['⚠️ Atenção', outrosAbertos.length + ' outro(s) processo(s) aberto(s) para esta viatura']);
+  }
+  mostrarSucesso({ titulo: 'Processo finalizado!', sub: 'ID: ' + procId, resumo: resumo, mensagemWhats: mensagem });
+  limparFormManut();
+}
+
+function abrirFormFinalizar(p){
+  if(!temPermissao('manut_editar')){ alert('Sem permissão.'); return; }
+  if(p.tipo === TIPO_AGENDAMENTO){ alert('Agendamentos não podem ser finalizados manualmente. Eles convertem automaticamente ou via botão "Converter agora".'); return; }
+  processoAtual = p;
+  setFormModo('finalizar');
+  preencherProcInfoBox(p);
+  $('mf-data').value = agoraDatetimeLocal();
+  $('mf-status').value = 'Ativa';
+  $('mf-local-wrap').innerHTML = '';
+  montarCampoLocalFinal();
+  $('mf-informante').value = p.entrada ? p.entrada.informante : '';
+  $('mf-detalhes').value = '';
+  $('mm-error').style.display = 'none'; $('mm-error').textContent = '';
+  showView('manutencao'); showManutTab('novo');
+}
+
+function cancelarFormManut(){
+  let temDados = false;
+  if(modoManutForm === 'criar'){
+    temDados = $('mm-tipo').value !== '' || $('mm-viatura').value.trim() !== '' || lerLocalForm('mm-local-wrap') !== '' || $('mm-solicitante').value.trim() !== '' || $('mm-informante').value.trim() !== '' || $('mm-detalhes').value.trim() !== '';
+  } else if(modoManutForm === 'evento'){
+    temDados = $('me-detalhes').value.trim() !== '' || $('me-informante').value.trim() !== '';
+  } else if(modoManutForm === 'finalizar'){
+    temDados = $('mf-detalhes').value.trim() !== '' || $('mf-informante').value.trim() !== '';
+  }
+  if(temDados && !confirm('Descartar o que foi digitado?')) return;
+  limparFormManut();
+  showManutTab('registros');
+  window.scrollTo(0, 0);
+}
+
+let _sucessoMensagemWhats = '';
+function mostrarSucesso({ titulo, sub, resumo, mensagemWhats }){
+  $('sucessoTitulo').textContent = titulo; $('sucessoSub').textContent = sub;
+  $('sucessoResumo').innerHTML = resumo.map(([k, v]) => `<div class="resumo-row"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('');
+  _sucessoMensagemWhats = mensagemWhats || '';
+  const btnWhats = $('sucessoWhats');
+  if(btnWhats) btnWhats.style.display = _sucessoMensagemWhats ? '' : 'none';
+  $('sucessoModal').style.display = 'flex';
+}
+function fecharSucesso(){
+  $('sucessoModal').style.display = 'none';
+  _sucessoMensagemWhats = '';
+  limparFormManut();
+  showManutTab('registros');
+  window.scrollTo(0, 0);
+}
+
+function abrirWhatsApp(texto) {
+  const textoCodificado = encodeURIComponent(texto);
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    window.location.href = `whatsapp://send?text=${textoCodificado}`;
+  } else {
+    window.open(`https://web.whatsapp.com/send?text=${textoCodificado}`, '_blank');
+  }
+}
+function normalizarEventoParaMensagem(e){
+  return { tipo: e.evento || e.tipo || '', data: e.data || '', status: e.status || '', local: e.local || '', informante: e.informante || '', detalhes: e.detalhes || '', dias: e.dias || '' };
+}
+function normalizarProcessoParaMensagem(p){
+  if(!p) return { id:'', viatura:'', status:'', local:'', entrada:'', informanteEntrada:'', saida:'', informanteSaida:'', dias:'', detalhes:'', eventos:[], solicitante:'' };
+  if(Array.isArray(p.eventos) && p.eventos.length > 0){
+    const entrada = p.eventos.find(e => { const ev = normalizeStr(e.evento || e.tipo); return ev.indexOf('entrada') !== -1 || ev.indexOf('agend') !== -1; }) || p.eventos[0];
+    const finalizacao = p.eventos.find(e => normalizeStr(e.evento || e.tipo).indexOf('finaliz') !== -1) || null;
+    const ultimo = p.eventos[p.eventos.length - 1];
+    return {
+      id: p.id || '', viatura: p.viatura || '',
+      status: ultimo ? (ultimo.status || '') : '',
+      local: ultimo ? (ultimo.local || '') : '',
+      entrada: entrada ? (entrada.data || '') : '',
+      informanteEntrada: entrada ? (entrada.informante || '') : '',
+      solicitante: (p.solicitante || (entrada ? entrada.solicitante : '')) || '',
+      saida: finalizacao ? (finalizacao.data || '') : '',
+      informanteSaida: finalizacao ? (finalizacao.informante || '') : '',
+      dias: finalizacao ? (finalizacao.dias || '') : '',
+      detalhes: finalizacao ? (finalizacao.detalhes || '') : '',
+      eventos: p.eventos.map(normalizarEventoParaMensagem)
+    };
+  }
+  return { id: p.id || '', viatura: p.viatura || '', status: p.status || '', local: p.local || '', entrada: typeof p.entrada === 'string' ? p.entrada : '', informanteEntrada: p.informanteEntrada || '', solicitante: p.solicitante || '', saida: p.saida || '', informanteSaida: p.informanteSaida || '', dias: p.dias || '', detalhes: p.detalhes || '', eventos: Array.isArray(p.eventos) ? p.eventos.map(normalizarEventoParaMensagem) : [] };
+}
+function montarBlocoEvento(ev){
+  const linhas = [];
+  linhas.push(iconeEvento(ev.tipo) + ' *' + (ev.tipo || 'Evento') + '* · ' + (ev.data || '—'));
+  if(ev.status) linhas.push('Status: ' + statusLabelManut(ev.status));
+  if(ev.local) linhas.push('Local: ' + ev.local);
+  if(ev.informante) linhas.push('Informante: ' + ev.informante);
+  if(ev.detalhes) linhas.push('Descrição: ' + ev.detalhes);
+  return linhas.join('\n');
+}
+function montarMensagemEntrada(p){
+  const proc = normalizarProcessoParaMensagem(p);
+  const tipo = p.tipo || TIPO_VIATURA;
+  const labelItem = tipo === TIPO_OUTRO ? 'Item' : 'Viatura';
+  const linhas = [];
+  linhas.push(tipo === TIPO_AGENDAMENTO ? '📅 *AGENDAMENTO* · ' + proc.id : '🛠 *NOVA MOVIMENTAÇÃO* · ' + proc.id);
+  linhas.push('');
+  linhas.push('*Tipo:* ' + tipo);
+  linhas.push('*' + labelItem + ':* ' + proc.viatura);
+  linhas.push('*Status:* ' + statusLabelManut(proc.status));
+  linhas.push('*Local:* ' + (proc.local || '—'));
+  linhas.push('*Entrada:* ' + (proc.entrada || '—'));
+  if(proc.solicitante) linhas.push('*Solicitante:* ' + proc.solicitante);
+  if(proc.informanteEntrada) linhas.push('*Informante:* ' + proc.informanteEntrada);
+  proc.eventos.forEach(ev => { linhas.push(''); linhas.push(montarBlocoEvento(ev)); });
+  linhas.push('');
+  linhas.push('_Registrado por: ' + (currentUser || 'DEMAN') + '_');
+  linhas.push('_DEMAN · ' + new Date().toLocaleString('pt-BR') + '_');
+  return linhas.join('\n');
+}
+function montarMensagemFinalizacao(p){
+  const proc = normalizarProcessoParaMensagem(p);
+  const tipo = p.tipo || TIPO_VIATURA;
+  const labelItem = tipo === TIPO_OUTRO ? 'Item' : 'Viatura';
+  const linhas = [];
+  linhas.push('✅ *FINALIZAÇÃO DA MOVIMENTAÇÃO* · ' + proc.id);
+  linhas.push('');
+  linhas.push('*Tipo:* ' + tipo);
+  linhas.push('*' + labelItem + ':* ' + proc.viatura);
+  if(proc.solicitante) linhas.push('*Solicitante:* ' + proc.solicitante);
+  linhas.push('*Status final:* ' + statusLabelManut(proc.status));
+  linhas.push('*Local final:* ' + (proc.local || '—'));
+  linhas.push('*Entrada:* ' + (proc.entrada || '—'));
+  linhas.push('*Saída:* ' + (proc.saida || '—'));
+  linhas.push('*Dias:* ' + (proc.dias || '—'));
+  proc.eventos.forEach(ev => { linhas.push(''); linhas.push(montarBlocoEvento(ev)); });
+  linhas.push('');
+  linhas.push('_Registrado por: ' + (currentUser || 'DEMAN') + '_');
+  linhas.push('_DEMAN · ' + new Date().toLocaleString('pt-BR') + '_');
+  return linhas.join('\n');
+}
+
+if(isLoggedIn()){
+  currentToken = sessionStorage.getItem('deman_token') || '';
+  currentLogin = sessionStorage.getItem('deman_user_login') || '';
+  currentUser = sessionStorage.getItem('deman_user_nome') || '';
+  currentPerfil = sessionStorage.getItem('deman_user_perfil') || 'view';
+  try{ currentPermissoes = JSON.parse(sessionStorage.getItem('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
+  startApp();
+} else { showLogin(); }
+bindPasswordToggles();
