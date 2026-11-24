@@ -127,19 +127,25 @@ function bindPasswordToggles(){
       e.preventDefault();
       const input = document.getElementById(btn.dataset.target);
       if(!input) return;
-      let mostrar;
-      if(input.classList.contains('pw-nativo')){ mostrar = input.type === 'password'; input.type = mostrar ? 'text' : 'password'; }
-      else { mostrar = !input.classList.contains('pw-visible'); input.classList.toggle('pw-visible', mostrar); }
-      btn.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
+      
+      // Lógica atualizada para usar a classe CSS
+      const isHidden = input.classList.contains('pw-field') && !input.classList.contains('pw-visible');
+      
+      if (isHidden) {
+        input.classList.add('pw-visible');
+      } else {
+        input.classList.remove('pw-visible');
+      }
+
+      btn.setAttribute('aria-label', isHidden ? 'Ocultar senha' : 'Mostrar senha');
       const eye = btn.querySelector('.icon-eye');
       const eyeOff = btn.querySelector('.icon-eye-off');
-      if(eye) eye.style.display = mostrar ? 'none' : 'block';
-      if(eyeOff) eyeOff.style.display = mostrar ? 'block' : 'none';
+      if(eye) eye.style.display = isHidden ? 'none' : 'block';
+      if(eyeOff) eyeOff.style.display = isHidden ? 'block' : 'none';
       try{ input.focus(); }catch(err){}
     });
   });
 }
-
 let _warmupPromise = null;
 function _pingVersao(url){
   if(!url || url.indexOf('COLE_AQUI') !== -1) return Promise.resolve();
