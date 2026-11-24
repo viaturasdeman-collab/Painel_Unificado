@@ -608,7 +608,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 input[type=text], input[type=search], textarea {
   text-transform: uppercase;
 }
-/* ─── EXCEÇÕES À CAIXA ALTA — login e troca de senha ─────────────── */
+/* ─── EXCEÇÕES À CAIXA ALTA — login e troca de senha ─────────────── */ 
 #loginUser, #loginPass, #cp-new, #cp-confirm, #um-root-pass, #um-user, input[type=password] {
   text-transform: none !important;
   letter-spacing: normal !important;
