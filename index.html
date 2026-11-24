@@ -31,13 +31,14 @@
     <h2>DEMAN · Acesso</h2>
     <p class="sub">Entre com suas credenciais para continuar.</p>
     
-    <!-- CAMPOS ISCA: O Chrome vai preencher esses aqui e ignorar os reais -->
+    <!-- CAMPOS ISCA: O Chrome preenche aqui e ignora os reais -->
     <input type="text" style="display:none" autocomplete="username">
     <input type="password" style="display:none" autocomplete="current-password">
 
     <input type="text" id="loginUser" placeholder="Usuário" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
     <div class="pass-wrap">
-      <input type="password" id="loginPass" placeholder="Senha" autocomplete="new-password">
+      <!-- CORRIGIDO AQUI: type="text" e classe pw-field -->
+      <input type="text" class="pw-field" id="loginPass" placeholder="Senha" autocomplete="off">
       <button type="button" class="pass-toggle" data-target="loginPass" aria-label="Mostrar senha" tabindex="-1">
         <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -463,7 +464,8 @@
     <div class="modal-grid">
       <label class="full">Nova senha
         <div class="pass-wrap">
-          <input type="password" id="cp-new" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+          <!-- CORRIGIDO AQUI -->
+          <input type="text" class="pw-field" id="cp-new" placeholder="Mínimo 6 caracteres" autocomplete="off">
           <button type="button" class="pass-toggle" data-target="cp-new" aria-label="Mostrar senha" tabindex="-1">
             <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -472,7 +474,8 @@
       </label>
       <label class="full">Confirmar nova senha
         <div class="pass-wrap">
-          <input type="password" id="cp-confirm" placeholder="Repita a senha" autocomplete="new-password">
+          <!-- CORRIGIDO AQUI -->
+          <input type="text" class="pw-field" id="cp-confirm" placeholder="Repita a senha" autocomplete="off">
           <button type="button" class="pass-toggle" data-target="cp-confirm" aria-label="Mostrar senha" tabindex="-1">
             <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -497,7 +500,8 @@
       </label>
       <label id="um-root-label">Senha do administrador
         <div class="pass-wrap">
-          <input type="password" id="um-root-pass" placeholder="Senha ROOT">
+          <!-- CORRIGIDO AQUI -->
+          <input type="text" class="pw-field" id="um-root-pass" placeholder="Senha ROOT" autocomplete="off">
           <button type="button" class="pass-toggle" data-target="um-root-pass" aria-label="Mostrar senha" tabindex="-1">
             <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
