@@ -1,4 +1,4 @@
-
+// ═══════════════════════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 const OS_APPS_SCRIPT_URL       = 'https://script.google.com/macros/s/AKfycbzMVSQtq7RSHFRnzRPFQgV-_YQ-TCWId3XrXiynaZ6gajqwKhaMZxe7ISRqAM8PTqyP3g/exec';
@@ -127,25 +127,19 @@ function bindPasswordToggles(){
       e.preventDefault();
       const input = document.getElementById(btn.dataset.target);
       if(!input) return;
-      
-      // Lógica atualizada para usar a classe CSS
-      const isHidden = input.classList.contains('pw-field') && !input.classList.contains('pw-visible');
-      
-      if (isHidden) {
-        input.classList.add('pw-visible');
-      } else {
-        input.classList.remove('pw-visible');
-      }
-
-      btn.setAttribute('aria-label', isHidden ? 'Ocultar senha' : 'Mostrar senha');
+      let mostrar;
+      if(input.classList.contains('pw-nativo')){ mostrar = input.type === 'password'; input.type = mostrar ? 'text' : 'password'; }
+      else { mostrar = !input.classList.contains('pw-visible'); input.classList.toggle('pw-visible', mostrar); }
+      btn.setAttribute('aria-label', mostrar ? 'Ocultar senha' : 'Mostrar senha');
       const eye = btn.querySelector('.icon-eye');
       const eyeOff = btn.querySelector('.icon-eye-off');
-      if(eye) eye.style.display = isHidden ? 'none' : 'block';
-      if(eyeOff) eyeOff.style.display = isHidden ? 'block' : 'none';
+      if(eye) eye.style.display = mostrar ? 'none' : 'block';
+      if(eyeOff) eyeOff.style.display = mostrar ? 'block' : 'none';
       try{ input.focus(); }catch(err){}
     });
   });
 }
+
 let _warmupPromise = null;
 function _pingVersao(url){
   if(!url || url.indexOf('COLE_AQUI') !== -1) return Promise.resolve();
@@ -337,9 +331,9 @@ async function apiCall(url, action, payload, opts){
     return { ok:false, error:'Erro de rede: ' + err.message };
   }
 }
-const apiOS       = (a,p) => apiCall(OS_APPS_SCRIPT_URL, a, p);
-const apiViaturas = (a,p) => apiCall(VIATURAS_APPS_SCRIPT_URL, a, p);
-const apiManut    = (a,p) => apiCall(MANUT_APPS_SCRIPT_URL, a, p);
+const apiOS       = (a,p,o) => apiCall(OS_APPS_SCRIPT_URL, a, p, o);
+const apiViaturas = (a,p,o) => apiCall(VIATURAS_APPS_SCRIPT_URL, a, p, o);
+const apiManut    = (a,p,o) => apiCall(MANUT_APPS_SCRIPT_URL, a, p, o);
 const apiPrev     = (a,p) => apiCall(PREVENTIVA_APPS_SCRIPT_URL, a, p);
 
 function showLogin(){ $('loginOverlay').style.display = 'flex'; $('loginUser').focus(); }
@@ -3170,6 +3164,85 @@ async function salvarManut(){
   if(modoManutForm === 'finalizar') return salvarFinalizarManut();
 }
 
+// Pergunta se o evento pertence ao processo ou é um novo (e, nesse caso, se o antigo já foi concluído).
+// Resolve com { acao:'parte' } | { acao:'cancelar' } | { acao:'novo', finalizar, dataFim, statusFinal }.
+function perguntarEventoProcesso(p, dataEvento){
+  return new Promise(resolve => {
+    const modal = $('eventoDecisaoModal');
+    const rotulo = (p.tipo === TIPO_OUTRO) ? 'Item' : 'Viatura';
+    const resumo = `<b>${escapeHtml(p.id)}</b> · ${rotulo} <b>${escapeHtml(p.viatura)}</b><br>Aberto em ${escapeHtml(p.entrada ? p.entrada.data : '—')}`;
+    $('ed-resumo').innerHTML = resumo;
+    $('ed-resumo2').innerHTML = resumo;
+    $('ed-data-fim').value = dataEvento || agoraDatetimeLocal();
+    $('ed-status-final').value = 'Ativa';
+    $('ed-step1').style.display = ''; $('ed-step2').style.display = 'none';
+    modal.style.display = 'flex';
+    const fechar = res => { modal.style.display = 'none'; resolve(res); };
+    $('ed-parte').onclick    = () => fechar({ acao:'parte' });
+    $('ed-cancelar').onclick = () => fechar({ acao:'cancelar' });
+    $('ed-novo').onclick     = () => { $('ed-step1').style.display = 'none'; $('ed-step2').style.display = ''; };
+    $('ed-voltar').onclick   = () => { $('ed-step2').style.display = 'none'; $('ed-step1').style.display = ''; };
+    $('ed-nao').onclick      = () => fechar({ acao:'novo', finalizar:false });
+    $('ed-sim').onclick      = () => {
+      const dfim = $('ed-data-fim').value;
+      if(!dfim){ alert('Informe a data da conclusão do processo anterior.'); return; }
+      fechar({ acao:'novo', finalizar:true, dataFim:dfim, statusFinal:$('ed-status-final').value });
+    };
+  });
+}
+
+// O evento digitado vira a ENTRADA de um novo processo (finalizando o antigo, se já concluído).
+async function salvarEventoComoNovoProcesso(escolha, f){
+  const err = $('mm-error'); const btn = $('mm-save');
+  const antigo = processoAtual; const procId = antigo.id; const tipo = antigo.tipo || TIPO_VIATURA;
+  const statusNovo = f.status || 'Em Manutenção';
+  btn.disabled = true; btn.textContent = 'Salvando…';
+  let r;
+  try {
+    r = await apiManut('encerrarEAbrirProcesso', {
+      idAntigo: procId,
+      finalizarAntigo: escolha.finalizar === true,
+      dataFimAntigo: escolha.dataFim || '',
+      statusFinalAntigo: escolha.statusFinal || 'Ativa',
+      status: statusNovo,
+      entrada: f.data,
+      local: f.local,
+      solicitante: f.solicitante,
+      informante: f.informante,
+      detalhes: f.detalhes
+    }, { semRetry:true });
+  } catch(e){
+    err.textContent = 'Erro inesperado: ' + (e.message || e);
+    err.style.display = 'block';
+    return;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salvar evento';
+  }
+  if(!r || !r.ok){ err.textContent = (r && r.error) || 'Erro ao salvar.'; err.style.display = 'block'; return; }
+  try{ sessionStorage.removeItem('deman_cache_manut_v6'); }catch(e){}
+  await loadDataManut();
+  const grupos = agruparPorProcesso();
+  const procCriado = grupos[r.id];
+  const resumo = [
+    ['Novo processo', r.id],
+    [tipo === TIPO_OUTRO ? 'Item' : 'Viatura', antigo.viatura],
+    ['Status', statusLabelManut(statusNovo)],
+    ['Local', f.local || '—'],
+    ['Entrada', f.data]
+  ];
+  if(escolha.finalizar){
+    resumo.push(['Processo anterior', procId + ' finalizado' + (r.diasAntigo != null ? ' (' + r.diasAntigo + 'd)' : '')]);
+  } else {
+    resumo.push(['⚠️ Atenção', 'O processo ' + procId + ' continua aberto']);
+  }
+  if(f.solicitante) resumo.push(['Solicitante', f.solicitante]);
+  resumo.push(['Informante', f.informante]);
+  const mensagem = procCriado ? montarMensagemEntrada(procCriado) : '';
+  mostrarSucesso({ titulo: 'Novo processo criado!', sub: 'ID: ' + r.id, resumo: resumo, mensagemWhats: mensagem });
+  limparFormManut();
+}
+
 async function salvarEventoManut(){
   if(!processoAtual) return;
   const err = $('mm-error'); const btn = $('mm-save'); err.style.display = 'none'; err.textContent = '';
@@ -3182,6 +3255,11 @@ async function salvarEventoManut(){
   const detalhes   = $('me-detalhes').value.trim();
   if(!data){ err.textContent = 'Informe a data.'; err.style.display='block'; return; }
   if(!informante){ err.textContent = 'Informe o informante.'; err.style.display='block'; return; }
+  if((processoAtual.tipo || TIPO_VIATURA) !== TIPO_AGENDAMENTO){
+    const escolha = await perguntarEventoProcesso(processoAtual, data);
+    if(escolha.acao === 'cancelar') return;
+    if(escolha.acao === 'novo') return salvarEventoComoNovoProcesso(escolha, { data, status, local, solicitante, informante, detalhes });
+  }
   btn.disabled = true; btn.textContent = 'Salvando…';
   const procId = processoAtual.id;
   let r;
