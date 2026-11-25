@@ -20,9 +20,7 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" as="style" onload="this.rel='stylesheet'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
-
-<!-- LINK PARA O ARQUIVO CSS -->
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=7.1">
 </head>
 <body>
 
@@ -31,14 +29,9 @@
     <h2>DEMAN · Acesso</h2>
     <p class="sub">Entre com suas credenciais para continuar.</p>
     
-    <!-- CAMPOS ISCA: O Chrome preenche aqui e ignora os reais -->
-    <input type="text" style="display:none" autocomplete="username">
-    <input type="password" style="display:none" autocomplete="current-password">
-
-    <input type="text" id="loginUser" placeholder="Usuário" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
+    <input type="text" id="loginUser" placeholder="Usuário" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
     <div class="pass-wrap">
-      <!-- CORRIGIDO AQUI: type="text" e classe pw-field -->
-      <input type="text" class="pw-field" id="loginPass" placeholder="Senha" autocomplete="off">
+      <input type="text" id="loginPass" placeholder="Senha" class="pw-field" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
       <button type="button" class="pass-toggle" data-target="loginPass" aria-label="Mostrar senha" tabindex="-1">
         <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -457,6 +450,41 @@
   </div>
 </div>
 
+<div id="eventoDecisaoModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="max-width:460px;">
+    <div id="ed-step1">
+      <h2>🔎 Esse evento faz parte do processo?</h2>
+      <p class="help">Confira se o evento pertence ao processo abaixo ou se é uma nova ocorrência.</p>
+      <div class="ed-resumo" id="ed-resumo"></div>
+      <div class="ed-actions">
+        <button type="button" class="btn primary" id="ed-parte">✔ Faz parte deste processo</button>
+        <button type="button" class="btn" id="ed-novo">➕ É um novo processo</button>
+        <button type="button" class="btn" id="ed-cancelar">Cancelar</button>
+      </div>
+    </div>
+    <div id="ed-step2" style="display:none;">
+      <h2>✅ O processo anterior já foi concluído?</h2>
+      <p class="help">Se já foi concluído, ele será <b>finalizado</b> e o novo processo será aberto a partir deste evento.</p>
+      <div class="ed-resumo" id="ed-resumo2"></div>
+      <div class="modal-grid">
+        <label class="full">Data da conclusão do processo anterior<input type="datetime-local" id="ed-data-fim"></label>
+        <label class="full">Status final da viatura
+          <select id="ed-status-final">
+            <option value="Ativa">Ativa</option>
+            <option value="Reserva">Reserva</option>
+            <option value="Baixada">Baixada</option>
+          </select>
+        </label>
+      </div>
+      <div class="ed-actions">
+        <button type="button" class="btn primary" id="ed-sim">Sim — finalizar o anterior e abrir o novo</button>
+        <button type="button" class="btn" id="ed-nao">Não — manter o anterior aberto e abrir o novo</button>
+        <button type="button" class="btn" id="ed-voltar">Voltar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="changePassModal" class="modal-overlay" style="display:none;">
   <div class="modal-box" style="max-width:440px;">
     <h2>🔐 Defina sua nova senha</h2>
@@ -464,8 +492,7 @@
     <div class="modal-grid">
       <label class="full">Nova senha
         <div class="pass-wrap">
-          <!-- CORRIGIDO AQUI -->
-          <input type="text" class="pw-field" id="cp-new" placeholder="Mínimo 6 caracteres" autocomplete="off">
+          <input type="text" id="cp-new" placeholder="Mínimo 6 caracteres" class="pw-field" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
           <button type="button" class="pass-toggle" data-target="cp-new" aria-label="Mostrar senha" tabindex="-1">
             <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -474,8 +501,7 @@
       </label>
       <label class="full">Confirmar nova senha
         <div class="pass-wrap">
-          <!-- CORRIGIDO AQUI -->
-          <input type="text" class="pw-field" id="cp-confirm" placeholder="Repita a senha" autocomplete="off">
+          <input type="text" id="cp-confirm" placeholder="Repita a senha" class="pw-field" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
           <button type="button" class="pass-toggle" data-target="cp-confirm" aria-label="Mostrar senha" tabindex="-1">
             <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -500,8 +526,7 @@
       </label>
       <label id="um-root-label">Senha do administrador
         <div class="pass-wrap">
-          <!-- CORRIGIDO AQUI -->
-          <input type="text" class="pw-field" id="um-root-pass" placeholder="Senha ROOT" autocomplete="off">
+          <input type="text" id="um-root-pass" placeholder="Senha ROOT" class="pw-field" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other">
           <button type="button" class="pass-toggle" data-target="um-root-pass" aria-label="Mostrar senha" tabindex="-1">
             <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -724,7 +749,6 @@
   </div>
 </div>
 
-<!-- LINK PARA O ARQUIVO JS -->
-<script src="app.js"></script>
+<script src="app.js?v=7.1"></script>
 </body>
 </html>
