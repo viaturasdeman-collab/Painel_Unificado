@@ -138,6 +138,9 @@ input[type=file]{font-size:13px;}
 input[type=datetime-local], input[type=date], input[type=time]{background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:9px 11px;font-family:'Inter',sans-serif;font-size:16px;width:100%;min-width:0;-webkit-appearance:none;touch-action:manipulation;}
 input[type=datetime-local]:focus, input[type=date]:focus, input[type=time]:focus{outline:1px solid var(--amber);}
 .pass-wrap{position:relative;display:block;width:100%;}
+.ed-actions{display:flex;flex-direction:column;gap:8px;margin-top:4px;}
+.ed-actions .btn{width:100%;justify-content:center;text-align:center;}
+.ed-resumo{font-size:13px;color:var(--text);background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.5;}
 .pass-wrap input{padding-right:44px !important;width:100%;}
 .pw-field{-webkit-text-security:disc;text-security:disc;}
 .pw-field.pw-visible{-webkit-text-security:none;text-security:none;}
@@ -608,7 +611,7 @@ footer.page-footer{text-align:center;color:var(--text-faint);font-size:11px;marg
 input[type=text], input[type=search], textarea {
   text-transform: uppercase;
 }
-/* ─── EXCEÇÕES À CAIXA ALTA — login e troca de senha ─────────────── */ 
+/* ─── EXCEÇÕES À CAIXA ALTA — login e troca de senha ─────────────── */
 #loginUser, #loginPass, #cp-new, #cp-confirm, #um-root-pass, #um-user, input[type=password] {
   text-transform: none !important;
   letter-spacing: normal !important;
