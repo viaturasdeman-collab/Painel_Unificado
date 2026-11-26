@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head> 
+<head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <title>DEMAN · Painel Unificado</title>
@@ -20,7 +20,7 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" as="style" onload="this.rel='stylesheet'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
-<link rel="stylesheet" href="style.css?v=7.1">
+<link rel="stylesheet" href="style.css?v=7.2">
 </head>
 <body>
 
@@ -669,6 +669,16 @@
         </div>
         <span><b>Previsão:</b></span>
         <select id="prevRepFilterPrevisao" style="min-width:170px;"><option value="">Todas</option></select>
+        <span><b>Por data:</b></span>
+        <select id="prevRepFilterData" style="min-width:200px;">
+          <option value="">Todas</option>
+          <option value="vencidas">⚠ Vencidas (data já passou)</option>
+          <option value="7">Vencem em até 7 dias</option>
+          <option value="15">Vencem em até 15 dias</option>
+          <option value="30">Vencem em até 30 dias</option>
+          <option value="60">Vencem em até 60 dias</option>
+          <option value="sem_data">Sem data</option>
+        </select>
         <span><b>KM restante:</b></span>
         <select id="prevRepFilterKm" style="min-width:150px;">
           <option value="">Todos</option>
@@ -749,6 +759,6 @@
   </div>
 </div>
 
-<script src="app.js?v=7.1"></script>
+<script src="app.js?v=7.2"></script>
 </body>
 </html>
