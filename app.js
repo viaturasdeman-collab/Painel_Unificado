@@ -1,3 +1,4 @@
+// ═══════════════════════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════════════════════
 const OS_APPS_SCRIPT_URL       = 'https://script.google.com/macros/s/AKfycbzMVSQtq7RSHFRnzRPFQgV-_YQ-TCWId3XrXiynaZ6gajqwKhaMZxe7ISRqAM8PTqyP3g/exec';
@@ -262,6 +263,7 @@ function _nomeRelatorioPreventiva(){
     const labels = { atrasado: 'Atrasado', curto: '0-2000km', medio: '2000-5000km', longo: 'acima-5000km', sem_dados: 'Sem dados' };
     filtros.push(labels[prevRepFiltroKm] || prevRepFiltroKm);
   }
+  if(prevRepFiltroData) filtros.push(prevRepRotuloData(prevRepFiltroData));
   if(prevRepFiltroGarantia) filtros.push(prevRepFiltroGarantia === 'vencida' ? 'Garantia Vencida' : 'Em garantia');
   if(prevRepFiltroBusca) filtros.push('busca ' + prevRepFiltroBusca);
 
@@ -2369,6 +2371,20 @@ let prevRepFiltroPrevisao = '';
 let prevRepFiltroKm = '';
 let prevRepFiltroBusca = '';
 let prevRepFiltroGarantia = '';
+let prevRepFiltroData = '';
+// Dias até a data da próxima troca (planilha): negativo = já venceu; null = sem data.
+function prevRepDiasParaVencer(v){
+  const d = v.proximaTroca ? parseDataBR(v.proximaTroca) : null;
+  if(!d || d.getFullYear() < 2020) return null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const alvo = new Date(d.getTime()); alvo.setHours(0,0,0,0);
+  return Math.round((alvo.getTime() - hoje.getTime()) / 86400000);
+}
+function prevRepRotuloData(f){
+  if(f === 'vencidas') return 'Vencidas por data';
+  if(f === 'sem_data') return 'Sem data';
+  return 'Vencem em até ' + f + ' dias';
+}
 function prevRepGarantiaStatus(v){
   const s = String(v.garantia||'').trim().toUpperCase();
   if(!s || s === '0') return 'sem_dados';
@@ -2451,6 +2467,15 @@ function prevRepAplicarFiltros(lista){
         if(ym !== prevRepFiltroPrevisao) return false;
       }
     }
+    if(prevRepFiltroData){
+      const dias = prevRepDiasParaVencer(v);
+      if(prevRepFiltroData === 'sem_data'){ if(dias !== null) return false; }
+      else {
+        if(dias === null) return false;
+        if(prevRepFiltroData === 'vencidas'){ if(dias >= 0) return false; }
+        else { const lim = parseInt(prevRepFiltroData, 10); if(dias < 0 || dias > lim) return false; }
+      }
+    }
     if(prevRepFiltroGarantia && prevRepGarantiaStatus(v) !== prevRepFiltroGarantia) return false;
     if(prevRepFiltroKm){
       if(prevRepFiltroKm === 'sem_dados'){
@@ -2503,6 +2528,7 @@ function prevRepRenderTabela(){
     const labels = { atrasado: 'Atrasado', curto: '0–2.000', medio: '2.000–5.000', longo: '>5.000', sem_dados: 'Sem dados' };
     partes.push('KM: ' + labels[prevRepFiltroKm]);
   }
+  if(prevRepFiltroData) partes.push('Data: ' + prevRepRotuloData(prevRepFiltroData));
   if(prevRepFiltroGarantia) partes.push('Garantia: ' + (prevRepFiltroGarantia === 'vencida' ? 'Vencida' : 'Em garantia'));
   if(prevRepFiltroBusca) partes.push('Busca: "' + prevRepFiltroBusca + '"');
   $('prevRepFilterResumo').innerHTML =
@@ -2526,6 +2552,8 @@ function prevRepRenderTabela(){
             prevTxt = p.data.toLocaleDateString('pt-BR');
             if(p.origem === 'estimada') prevTxt += ' (est.)';
             prevCor = p.data < new Date(hoje.getTime() + 30*86400000) ? 'var(--amber)' : 'var(--text)';
+            const diasPrev = prevRepDiasParaVencer(v);
+            if(p.origem === 'planilha' && diasPrev !== null && diasPrev < 0){ prevTxt += ' ⚠ venceu'; prevCor = 'var(--vermelho)'; }
           }
         }
         const faltaTxt = v.falta != null
@@ -2549,14 +2577,14 @@ function prevRepRenderTabela(){
 }
 function abrirRelatorioPreventiva(){
   if(!PREV_VIATURAS.length){ alert('Carregando dados… Aguarde um instante e tente novamente.'); loadDataPreventiva(); return; }
-  prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = ''; prevRepFiltroGarantia = '';
+  prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = ''; prevRepFiltroGarantia = ''; prevRepFiltroData = '';
   prevRepSetOleoSelecionado([]);
-  $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = ''; $('prevRepFilterGarantia').value = '';
+  $('prevRepFilterKm').value = ''; $('prevRepFilterBusca').value = ''; $('prevRepFilterGarantia').value = ''; $('prevRepFilterData').value = '';
   prevRepPopularPrevisao(PREV_VIATURAS);
   const agora = new Date();
   $('prevReportMeta').innerHTML = 'Emitido em ' + agora.toLocaleDateString('pt-BR') + ' às ' + agora.toLocaleTimeString('pt-BR') + '<br>Por: <b style="color:var(--amber);">' + escapeHtml(currentUser || '—') + '</b>';
   const groupOleo = $('prevRepFilterOleoGroup');
-  const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const selGar = $('prevRepFilterGarantia'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
+  const selPrev = $('prevRepFilterPrevisao'); const selKm = $('prevRepFilterKm'); const selGar = $('prevRepFilterGarantia'); const selData = $('prevRepFilterData'); const inpBusca = $('prevRepFilterBusca'); const btnLimpar = $('prevRepFilterLimpar');
   if(groupOleo && !groupOleo.dataset.bound){
     groupOleo.dataset.bound = '1';
     groupOleo.addEventListener('change', () => {
@@ -2567,14 +2595,15 @@ function abrirRelatorioPreventiva(){
   }
   if(selPrev && !selPrev.dataset.bound){ selPrev.dataset.bound = '1'; selPrev.addEventListener('change', () => { prevRepFiltroPrevisao = selPrev.value; prevRepRenderTabela(); }); }
   if(selKm && !selKm.dataset.bound){ selKm.dataset.bound = '1'; selKm.addEventListener('change', () => { prevRepFiltroKm = selKm.value; prevRepRenderTabela(); }); }
+  if(selData && !selData.dataset.bound){ selData.dataset.bound = '1'; selData.addEventListener('change', () => { prevRepFiltroData = selData.value; prevRepRenderTabela(); }); }
   if(selGar && !selGar.dataset.bound){ selGar.dataset.bound = '1'; selGar.addEventListener('change', () => { prevRepFiltroGarantia = selGar.value; prevRepRenderTabela(); }); }
   if(inpBusca && !inpBusca.dataset.bound){ inpBusca.dataset.bound = '1'; inpBusca.addEventListener('input', debounce(() => { prevRepFiltroBusca = inpBusca.value; prevRepRenderTabela(); }, 180)); }
   if(btnLimpar && !btnLimpar.dataset.bound){
     btnLimpar.dataset.bound = '1';
     btnLimpar.addEventListener('click', () => {
-      prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = ''; prevRepFiltroGarantia = '';
+      prevRepFiltroOleo = []; prevRepFiltroPrevisao = ''; prevRepFiltroKm = ''; prevRepFiltroBusca = ''; prevRepFiltroGarantia = ''; prevRepFiltroData = '';
       prevRepSetOleoSelecionado([]);
-      if(selPrev) selPrev.value = ''; if(selKm) selKm.value = ''; if(selGar) selGar.value = ''; if(inpBusca) inpBusca.value = '';
+      if(selPrev) selPrev.value = ''; if(selKm) selKm.value = ''; if(selGar) selGar.value = ''; if(selData) selData.value = ''; if(inpBusca) inpBusca.value = '';
       prevRepRenderTabela();
     });
   }
