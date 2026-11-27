@@ -9,7 +9,7 @@
 // - fontes e papaparse (CDN): guardados, atualizados em segundo plano
 // - Apps Script (dados) e qualquer outro domínio: SEMPRE direto na rede, nunca em cache
 // ============================================================================
-const VERSAO = '7.4';
+const VERSAO = '7.5';
 const CACHE  = 'deman-' + VERSAO;
 
 const BASICOS = [
