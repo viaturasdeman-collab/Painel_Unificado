@@ -274,7 +274,17 @@ const MESES_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
 function formatarMesAno(ym){ if(!ym) return ''; const p = ym.split('-'); return MESES_PT[parseInt(p[1],10)-1] + '/' + p[0]; }
 
 let currentUser = ''; let currentPerfil = 'view'; let currentLogin = ''; let currentPermissoes = {}; let primeiraSenhaUsada = ''; let currentToken = '';
-function isLoggedIn(){ return sessionStorage.getItem('deman_auth') === 'ok' && !!sessionStorage.getItem('deman_token'); }
+// ─── Sessão: "manter conectado" (localStorage) ou só enquanto o app está aberto (sessionStorage) ───
+const AUTH_KEYS = ['deman_auth','deman_token','deman_user_login','deman_user_nome','deman_user_perfil','deman_user_permissoes'];
+function authGet(k){ try{ return sessionStorage.getItem(k) || localStorage.getItem(k); }catch(e){ return null; } }
+function authLimpar(){ AUTH_KEYS.forEach(k => { try{ sessionStorage.removeItem(k); }catch(e){} try{ localStorage.removeItem(k); }catch(e){} }); }
+function authSalvar(dados, manter){
+  authLimpar();
+  const store = manter ? localStorage : sessionStorage;
+  try{ Object.keys(dados).forEach(k => store.setItem(k, dados[k])); }catch(e){}
+}
+function authEhPersistente(){ try{ return localStorage.getItem('deman_auth') === 'ok'; }catch(e){ return false; } }
+function isLoggedIn(){ return authGet('deman_auth') === 'ok' && !!authGet('deman_token'); }
 function temPermissao(p){
   if(currentLogin === ROOT_LOGIN) return true;
   if(currentPermissoes[p] === true) return true;
@@ -353,7 +363,8 @@ async function handleLogin(){
   if(_warmupPromise){ try{ await _warmupPromise; }catch(e){} }
   clearTimeout(t1); clearTimeout(t2);
   btn.textContent = 'Entrando…';
-  const r = await apiOS('autenticar', { login:u, senha:p }, { semRetry:true, timeout:55000 });
+  const manterConectado = !!($('loginKeep') && $('loginKeep').checked);
+  const r = await apiOS('autenticar', { login:u, senha:p, manter: manterConectado }, { semRetry:true, timeout:55000 });
   clearTimeout(t3); clearTimeout(t4);
   btn.disabled = false; btn.textContent = 'Entrar';
   if(!r.ok){ err.textContent = r.error || 'Usuário ou senha inválidos.'; err.style.display = 'block'; return; }
@@ -361,18 +372,16 @@ async function handleLogin(){
   primeiraSenhaUsada = p;
   $('loginPass').value = '';
   currentToken = r.token;
-  sessionStorage.setItem('deman_token', r.token);
-  sessionStorage.setItem('deman_auth','ok');
-  sessionStorage.setItem('deman_user_login', u);
-  sessionStorage.setItem('deman_user_nome', r.nome || u);
-  sessionStorage.setItem('deman_user_perfil', r.perfil || 'view');
-  sessionStorage.setItem('deman_user_permissoes', JSON.stringify(r.permissoes || {}));
+  authSalvar({
+    deman_token: r.token, deman_auth: 'ok', deman_user_login: u, deman_user_nome: r.nome || u,
+    deman_user_perfil: r.perfil || 'view', deman_user_permissoes: JSON.stringify(r.permissoes || {})
+  }, manterConectado && r.duradoura !== false);
   currentLogin = u; currentUser = r.nome || u; currentPerfil = r.perfil || 'view'; currentPermissoes = r.permissoes || {};
   if(r.primeiroAcesso === true){ hideLogin(); abrirTrocarSenha(true); return; }
   startApp();
 }
 function handleLogout(){
-  const fim = () => { try{ localStorage.removeItem(STORAGE_KEY_OS); }catch(e){} try{ sessionStorage.clear(); }catch(e){} location.reload(); };
+  const fim = () => { try{ localStorage.removeItem(STORAGE_KEY_OS); }catch(e){} authLimpar(); try{ sessionStorage.clear(); }catch(e){} location.reload(); };
   if(currentToken && !_sessaoExpirando){
     Promise.race([
       apiCall(OS_APPS_SCRIPT_URL, 'logout', {}, { semRetry:true, timeout:4000 }),
@@ -2907,12 +2916,31 @@ document.addEventListener('keydown', e => {
 // ═══════════════════════════════════════════════════════════════════════════
 // START APP
 // ═══════════════════════════════════════════════════════════════════════════
+// Sessão salva no aparelho: confere no servidor o perfil/permissões ATUAIS (podem ter mudado
+// desde o login) e se a conta continua ativa. Sessão inválida é tratada em apiCall (volta ao login).
+async function atualizarPerfilSessao(){
+  try{
+    const r = await apiOS('perfil', {}, { semRetry:true, timeout:25000 });
+    if(!r || !r.ok) return;
+    const novo = {
+      deman_user_nome: r.nome || currentLogin,
+      deman_user_perfil: r.perfil || 'view',
+      deman_user_permissoes: JSON.stringify(r.permissoes || {})
+    };
+    const mudou = novo.deman_user_nome !== currentUser || novo.deman_user_perfil !== currentPerfil ||
+                  novo.deman_user_permissoes !== JSON.stringify(currentPermissoes || {});
+    if(!mudou) return;
+    Object.keys(novo).forEach(k => { try{ localStorage.setItem(k, novo[k]); }catch(e){} });
+    location.reload();
+  }catch(e){}
+}
+
 function startApp(){
   hideLogin(); $('app').classList.add('is-ready'); syncInternetTime();
-  currentUser = sessionStorage.getItem('deman_user_nome') || '';
-  currentPerfil = sessionStorage.getItem('deman_user_perfil') || 'view';
-  currentLogin = sessionStorage.getItem('deman_user_login') || '';
-  try{ currentPermissoes = JSON.parse(sessionStorage.getItem('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
+  currentUser = authGet('deman_user_nome') || '';
+  currentPerfil = authGet('deman_user_perfil') || 'view';
+  currentLogin = authGet('deman_user_login') || '';
+  try{ currentPermissoes = JSON.parse(authGet('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
   $('currentUserName').textContent = currentUser || '—';
   const perfilEl = $('currentUserPerfil');
   if(perfilEl){ perfilEl.textContent = isAdmin() ? 'ADMIN' : 'VISUALIZAÇÃO'; perfilEl.className = 'badge-perfil ' + (isAdmin() ? 'admin' : 'view'); perfilEl.style.display = 'inline-block'; }
@@ -3508,11 +3536,17 @@ function montarMensagemFinalizacao(p){
 }
 
 if(isLoggedIn()){
-  currentToken = sessionStorage.getItem('deman_token') || '';
-  currentLogin = sessionStorage.getItem('deman_user_login') || '';
-  currentUser = sessionStorage.getItem('deman_user_nome') || '';
-  currentPerfil = sessionStorage.getItem('deman_user_perfil') || 'view';
-  try{ currentPermissoes = JSON.parse(sessionStorage.getItem('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
+  currentToken = authGet('deman_token') || '';
+  currentLogin = authGet('deman_user_login') || '';
+  currentUser = authGet('deman_user_nome') || '';
+  currentPerfil = authGet('deman_user_perfil') || 'view';
+  try{ currentPermissoes = JSON.parse(authGet('deman_user_permissoes') || '{}'); }catch(e){ currentPermissoes = {}; }
   startApp();
+  if(authEhPersistente()) atualizarPerfilSessao();
 } else { showLogin(); }
 bindPasswordToggles();
+(function(){
+  const k = $('loginKeep'); if(!k) return;
+  const celular = (window.matchMedia && (matchMedia('(pointer: coarse)').matches || matchMedia('(display-mode: standalone)').matches)) || window.navigator.standalone === true;
+  k.checked = !!celular;   // no celular já vem marcado; no computador, desmarcado
+})();
