@@ -10,8 +10,11 @@
 <meta name="format-detection" content="telephone=no">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#10141A">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%2310141A'/%3E%3Crect x='0' y='0' width='12' height='180' fill='%23E8A93A'/%3E%3Ctext x='96' y='118' font-family='system-ui' font-size='76' font-weight='700' fill='%23E8A93A' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E">
-<link rel="manifest" href='data:application/manifest+json,{"name":"DEMAN","short_name":"DEMAN","start_url":"./","display":"standalone","background_color":"%2310141A","theme_color":"%2310141A","orientation":"portrait-primary"}'>
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="icons/favicon-48.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="dns-prefetch" href="https://script.google.com">
 <link rel="dns-prefetch" href="https://script.googleusercontent.com">
 <link rel="preconnect" href="https://script.google.com" crossorigin>
@@ -20,7 +23,7 @@
 <link rel="preload" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" as="style" onload="this.rel='stylesheet'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"></noscript>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" defer></script>
-<link rel="stylesheet" href="style.css?v=7.2">
+<link rel="stylesheet" href="style.css?v=7.3">
 </head>
 <body>
 
@@ -759,6 +762,7 @@
   </div>
 </div>
 
-<script src="app.js?v=7.2"></script>
+<script src="app.js?v=7.3"></script>
+<script src="pwa.js?v=7.3" defer></script>
 </body>
 </html>
