@@ -9,7 +9,7 @@
 // - fontes e papaparse (CDN): guardados, atualizados em segundo plano
 // - Apps Script (dados) e qualquer outro domínio: SEMPRE direto na rede, nunca em cache
 // ============================================================================
-const VERSAO = '7.3';
+const VERSAO = '7.4';
 const CACHE  = 'deman-' + VERSAO;
 
 const BASICOS = [
@@ -76,7 +76,13 @@ self.addEventListener('fetch', event => {
 
   if(url.origin === self.location.origin){
     if(url.pathname.endsWith('/sw.js')) return;                   // o navegador cuida da atualização
-    if(req.mode === 'navigate') return event.respondWith(navegacao());
+    if(req.mode === 'navigate'){
+      // Só a página principal usa o index.html guardado. Qualquer outro endereço
+      // aberto direto (um ícone, o manifest...) vai normalmente para a rede.
+      const raiz = new URL('./', self.location).pathname;
+      if(url.pathname === raiz || url.pathname === raiz + 'index.html') return event.respondWith(navegacao());
+      return;
+    }
     return event.respondWith(cacheFirst(req));
   }
   if(HOSTS_TERCEIROS.includes(url.hostname)) return event.respondWith(staleWhileRevalidate(req));
